@@ -41,7 +41,10 @@ check_and_kill_libcamera
 #        capture_still "$i" "$cam"
 #    done
 # done
-capture_still 0 0 10000 &
-capture_still 0 1 10000 &
+shutter0=$1
+shutter1=$2
+
+capture_still 0 0 "$shutter0" &
+capture_still 0 1 "$shutter1" &
 wait
 

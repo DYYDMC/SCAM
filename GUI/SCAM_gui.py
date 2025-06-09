@@ -14,6 +14,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QLineEdit, QLabel
 from PyQt5.QtWidgets import QComboBox, QPushButton
+from PyQt5.QtWidgets import QLineEdit
 
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
@@ -68,6 +69,24 @@ class MainWindow(QWidget):
         left_panel.addWidget(self.tilt_label)
         left_panel.addWidget(self.tilt_dropdown)
         left_panel.addWidget(self.btn_send_coords)
+        
+        # Camera shutter time inputs
+        self.label_shutter0 = QLabel("Shutter time cam0 (μs):")
+        self.input_shutter0 = QLineEdit()
+        self.input_shutter0.setPlaceholderText("100000")
+
+        self.label_shutter1 = QLabel("Shutter time cam1 (μs):")
+        self.input_shutter1 = QLineEdit()
+        self.input_shutter1.setPlaceholderText("1000000")
+
+        self.btn_take_photo = QPushButton("Take Photo")
+        self.btn_take_photo.clicked.connect(self.take_photo)
+
+        left_panel.addWidget(self.label_shutter0)
+        left_panel.addWidget(self.input_shutter0)
+        left_panel.addWidget(self.label_shutter1)
+        left_panel.addWidget(self.input_shutter1)
+        left_panel.addWidget(self.btn_take_photo)
 
         left_panel.addStretch()  # Move to the end
 
@@ -93,16 +112,15 @@ class MainWindow(QWidget):
         right_panel.addWidget(self.canvas, 1)
 
         layout.addLayout(right_panel, 3)
-
+        
     def run_cam_roi(self):
         cam0_path = os.path.join(CAM_ROI_PATH, "roi_cam0.jpg")
         cam1_path = os.path.join(CAM_ROI_PATH, "roi_cam1.jpg")
         if os.path.exists(cam0_path) and os.path.exists(cam1_path):
-            print("EXIST!")
-            self.load_images()
+            self.load_images(cam0_path, cam1_path)
         else:
             subprocess.run(["python3", os.path.join(CAM_ROI_PATH, "roi_master_script.py")])
-            self.load_images()
+            self.load_images(cam0_path, cam1_path)
 
     def run_scan_spec(self):
         int_time = self.integration_input.text()
@@ -110,17 +128,28 @@ class MainWindow(QWidget):
             int_time = "100"
         subprocess.run(["python3", os.path.join(SPEC_SCAN_PATH, "simple_scan.py"), int_time])
         self.load_plot()
-
-    def load_images(self):
-        print('load images')
-        for idx, label in enumerate([self.label_cam0, self.label_cam1]):
-            fname = os.path.join(CAM_ROI_PATH, f"roi_cam{idx}.jpg")
-            print(fname)
-            if os.path.exists(fname):
-                pixmap = QPixmap(fname).scaled(400, 300, Qt.KeepAspectRatio)
+        
+    def load_images(self, path0=os.path.join(CAM_ROI_PATH,"roi_cam0.jpg"), path1=os.path.join(CAM_ROI_PATH,"roi_cam1.jpg")):
+        for idx, (label, path) in enumerate(zip([self.label_cam0, self.label_cam1], [path0, path1])):
+            if os.path.exists(path):
+                pixmap = QPixmap(path).scaled(400, 300, Qt.KeepAspectRatio)
                 label.setPixmap(pixmap)
             else:
-                label.setText(f"{fname} not found")
+                label.setText(f"{path} not found")
+
+    
+    def take_photo(self):
+        shutter0 = self.input_shutter0.text().strip() or "100000"
+        shutter1 = self.input_shutter1.text().strip() or "1000000"
+        try:
+            subprocess.run(
+                ["/bin/bash",CAM_ROI_PATH, shutter0, shutter1],
+                check=True
+            )
+            self.load_images("cam0_0.jpg", "cam1_0.jpg")
+        except subprocess.CalledProcessError as e:
+            print(f"Photo capture failed: {e}")
+
     
     def load_plot(self):
         self.figure.clear()
