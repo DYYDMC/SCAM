@@ -143,7 +143,7 @@ class MainWindow(QWidget):
         shutter1 = self.input_shutter1.text().strip() or "1000000"
         try:
             subprocess.run(
-                ["/bin/bash",CAM_ROI_PATH, shutter0, shutter1],
+                ["/bin/bash",os.path.join(CAM_ROI_PATH,'cam_take_photo.sh'), shutter0, shutter1],
                 check=True
             )
             self.load_images("cam0_0.jpg", "cam1_0.jpg")
