@@ -146,7 +146,7 @@ class MainWindow(QWidget):
                 ["/bin/bash",os.path.join(CAM_ROI_PATH,'cam_take_photo.sh'), shutter0, shutter1],
                 check=True
             )
-            self.load_images("cam0_0.jpg", "cam1_0.jpg")
+            self.load_images(os.path.join(CAM_ROI_PATH,"cam0_0.jpg", os.path.join(CAM_ROI_PATH,"cam1_0.jpg")
         except subprocess.CalledProcessError as e:
             print(f"Photo capture failed: {e}")
 
