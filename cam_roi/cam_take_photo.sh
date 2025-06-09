@@ -8,6 +8,7 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 capture_still() {
     local index=$1
     local camera_id=$2
+    local exposure_time=$3
     local output_file="${SCRIPT_DIR}/cam${camera_id}_${index}.jpg"
     ROI=$(set_roi "$camera_id")
     echo "$ROI"
@@ -25,6 +26,7 @@ capture_still() {
         --sharpness 1 \
         --autofocus-mode manual \
         --lens-position $LENS \
+        --shutter "$exposure_time" \
         --camera $camera_id \
         --output "$output_file"
 }
@@ -34,9 +36,12 @@ echo "+++++++++++++++++official recording starts+++++++++++++++++++++++++++++"
 
 check_and_kill_libcamera
 
-for i in {0..1}; do
-    for cam in 0 1; do
-        capture_still "$i" "$cam"
-    done
-done
+#for i in {0..1}; do
+#    for cam in 0 1; do
+#        capture_still "$i" "$cam"
+#    done
+# done
+capture_still 0 0 10000 &
+capture_still 0 1 10000 &
+wait
 
