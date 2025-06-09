@@ -12,6 +12,12 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QLineEdit, QLabel
 
+HOME = os.path.expanduser("~")
+SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
+SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
+GUI_PATH = os.path.join(SCAM_PATH, "GUI")
+
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -65,38 +71,38 @@ class MainWindow(QWidget):
         layout.addLayout(right_panel, 3)
 
     def run_cam_roi(self):
-        cam0_path = "/Users/eulerlab/Github/SCAM/cam_roi/roi_cam0.jpg"
-        cam1_path = "/Users/eulerlab/Github/SCAM/cam_roi/roi_cam1.jpg"
+        cam0_path = os.path.join(CAM_ROI_PATH, "roi_cam0.jpg")
+        cam1_path = os.path.join(CAM_ROI_PATH, "roi_cam1.jpg")
         if os.path.exists(cam0_path) and os.path.exists(cam1_path):
             print("EXIST!")
             self.load_images()
         else:
-            subprocess.run(["python3", "/Users/eulerlab/Github/SCAM/cam_roi/roi_master_script.py"])
+            subprocess.run(["python3", os.path.join(CAM_ROI_PATH, "roi_master_script.py")])
             self.load_images()
 
     def run_scan_spec(self):
         int_time = self.integration_input.text()
         if int_time.strip() == "":
             int_time = "100"
-        subprocess.run(["python3", "/Users/eulerlab/Github/SCAM/spec_scan/simple_scan.py",int_time])
+        subprocess.run(["python3", os.path.join(SPEC_SCAN_PATH, "simple_scan.py"), int_time])
         self.load_plot()
 
     def load_images(self):
         print('load images')
         for idx, label in enumerate([self.label_cam0, self.label_cam1]):
-            fname = f"/Users/eulerlab/Github/SCAM/cam_roi/roi_cam{idx}.jpg"
+            fname = os.path.join(CAM_ROI_PATH, f"roi_cam{idx}.jpg")
             print(fname)
             if os.path.exists(fname):
                 pixmap = QPixmap(fname).scaled(400, 300, Qt.KeepAspectRatio)
                 label.setPixmap(pixmap)
             else:
                 label.setText(f"{fname} not found")
-
+    
     def load_plot(self):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
         try:
-            data = np.load("./scan_output.npz")
+            data = np.load(os.path.join(GUI_PATH, "scan_output.npz"))
             wavelengths = data["wavelength"]
             intensity = data["dark_avg"]
             ax.plot(wavelengths, intensity)
