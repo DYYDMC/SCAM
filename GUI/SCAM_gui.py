@@ -2,6 +2,8 @@ import sys
 import subprocess
 import os
 import numpy as np
+
+
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout,
     QPushButton, QLabel, QFileDialog
@@ -11,13 +13,17 @@ from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtWidgets import QLineEdit, QLabel
+from PyQt5.QtWidgets import QComboBox, QPushButton
 
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
 SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
 GUI_PATH = os.path.join(SCAM_PATH, "GUI")
+RS_PATH = os.path.join(SCAM_PATH,'rs_motor')
 
+sys.path.insert(1,RS_PATH)
+from ESP32_light_utils import initialize_connection, move_to_esp32
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -44,6 +50,24 @@ class MainWindow(QWidget):
         self.integration_input.setPlaceholderText("100")
         left_panel.addWidget(self.integration_label)
         left_panel.addWidget(self.integration_input)
+        
+        # Dropdowns for pan and tilt
+        self.pan_dropdown = QComboBox()
+        self.pan_dropdown.addItems([str(i) for i in range(90, -91, -1)])  # 90 to -90
+        self.pan_label = QLabel("Horizontal (pan)")
+
+        self.tilt_dropdown = QComboBox()
+        self.tilt_dropdown.addItems([str(i) for i in range(36, -55, -1)])  # 36 to -54
+        self.tilt_label = QLabel("Vertical (tilt)")
+
+        self.btn_send_coords = QPushButton("Send")
+        self.btn_send_coords.clicked.connect(self.send_coordinates)
+
+        left_panel.addWidget(self.pan_label)
+        left_panel.addWidget(self.pan_dropdown)
+        left_panel.addWidget(self.tilt_label)
+        left_panel.addWidget(self.tilt_dropdown)
+        left_panel.addWidget(self.btn_send_coords)
 
         left_panel.addStretch()  # Move to the end
 
@@ -112,6 +136,16 @@ class MainWindow(QWidget):
         except Exception as e:
             ax.text(0.5, 0.5, f"Error loading spectrum:\n{str(e)}", ha='center', va='center')
         self.canvas.draw()
+    
+    def send_coordinates(self):
+        try:
+            pan = int(self.pan_dropdown.currentText())
+            tilt = int(self.tilt_dropdown.currentText())
+            initialize_connection()
+            move_to_esp32(pan, tilt)
+        except Exception as e:
+            print(f"Error sending coordinates: {e}")
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
