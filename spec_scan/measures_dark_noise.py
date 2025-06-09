@@ -27,7 +27,7 @@ if response.strip().upper() != 'Y':
     exit(1)
 
 # Define integration times (in milliseconds)
-integration_times_ms = [10, 20, 40, 80]#, 100, 200, 300, 400, 500, 800, 1000, 1200, 1500, 1800, 2000, 2500, 3000, 4000, 5000, 8000, 10000]
+integration_times_ms = [100, 200, 300, 400, 500, 800, 1000, 1200, 1500, 1800, 2000, 2500, 3000]# [10, 20, 40, 80]#, 100, 200, 300, 400, 500, 800, 1000, 1200, 1500, 1800, 2000, 2500, 3000, 4000, 5000, 8000, 10000]
 
 # Create output directory
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
