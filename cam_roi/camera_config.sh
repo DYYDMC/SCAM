@@ -30,13 +30,15 @@ GAIN_LIST=(1.12 2 3 4 5 6 7 8)
 # Function to set ROI based on camera ID
 set_roi() {
     local cam_id=$1
-    local roi_file="$HOME/roi_images/cam${cam_id}_roi.npy"  # Adjust the path as needed
+    local script_dir="$(dirname "${BASH_SOURCE[0]}")"
+    local roi_file="${script_dir}/roi_cam${cam_id}.npy"
     if [[ -f "$roi_file" ]]; then
-        python3 ./read_roi.py "$roi_file"
+        python3 "${script_dir}/read_roi.py" "$roi_file"
     else
         echo "ROI file not found for camera ID $cam_id"
     fi
 }
+
 # Function to run libcamera-vid with predefined parameters
 capture_video() {
     local output_file=$1
