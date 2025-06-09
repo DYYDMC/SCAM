@@ -1,7 +1,10 @@
 #!/bin/bash
-source /home/ydeng/GitHub/rgbCamera/bash_scripts/camera_config.sh
 
-OUTFILE="/home/ydeng/GitHub/rgbCamera/bash_scripts/cam0_deskAgain"
+# Load configuration from same directory
+source "$(dirname "${BASH_SOURCE[0]}")/camera_config.sh"
+
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+OUTFILE="${SCRIPT_DIR}/cam0_${IDX}"
 capture_still() {
     local output_file=$1
     local camera_id=$2
@@ -29,7 +32,7 @@ echo "+++++++++++++++++official recording starts   +++++++++++++++++++++++++++++
 
 check_and_kill_libcamera
 
-for i in {0..10}
+for i in {0..1}
 do
 echo $OUTFILE"$i.jpg"
 capture_still $OUTFILE"$i.jpg" 0
