@@ -10,4 +10,5 @@ time.sleep(2)
 move_to_esp32(0, v_max)
 time.sleep(2)
 move_to_esp32(0, v_min)
-
+time.sleep(2)
+move_to_esp32(0,0)
