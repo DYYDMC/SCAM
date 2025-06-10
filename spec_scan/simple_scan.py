@@ -2,26 +2,95 @@ import os
 import seabreeze.spectrometers as sb
 import numpy as np
 import sys
+import time
+import json
+from datetime import datetime
+
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
-GUI_PATH = os.path.join(SCAM_PATH,'GUI')
+GUI_PATH = os.path.join(SCAM_PATH, 'GUI')
+DARK_NOISE_PATH = os.path.join(SCAM_PATH, "dark_noises")
 
+def load_dark_noise(int_time):
+    """Load dark noise for given integration time"""
+    dark_file = os.path.join(DARK_NOISE_PATH, f"dark_{int_time}ms.npz")
+    if not os.path.exists(dark_file):
+        raise FileNotFoundError(f"Dark noise file not found for {int_time}ms")
+    return np.load(dark_file)['dark_avg']
 
-# print("HA")
-spec = sb.Spectrometer.from_serial_number("S03615")#STS-UV-L-100-400-SMA
-# serial number
-print ('spectrometer serial number: ',spec.serial_number)
-int_time = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+def save_scan_data(wavelengths, intensity, dark_corrected, metadata=None):
+    """Save scan data with optional metadata"""
+    timestamp = datetime.now().isoformat()
+    output_file = os.path.join(GUI_PATH, 'scan_output.npz')
+    
+    save_dict = {
+        'wavelength': wavelengths,
+        'intensity': intensity,  # Raw intensity
+        'dark_avg': dark_corrected,  # Dark-corrected intensity
+        'timestamp': timestamp
+    }
+    
+    if metadata:
+        save_dict['metadata'] = metadata
+    
+    np.savez(output_file, **save_dict)
+    
+    # Also save as JSON for easier human reading
+    json_data = {
+        'timestamp': timestamp,
+        'wavelengths': wavelengths.tolist(),
+        'intensity': intensity.tolist(),
+        'dark_corrected': dark_corrected.tolist()
+    }
+    if metadata:
+        json_data['metadata'] = metadata
+        
+    with open(os.path.join(GUI_PATH, 'scan_output.json'), 'w') as f:
+        json.dump(json_data, f)
 
-# print("HERE")
-spec.integration_time_micros(int_time * 1000)
-wavelengths, intensity = spec.spectrum()
+def main():
+    try:
+        # Get integration time from command line
+        int_time = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+        
+        # Initialize spectrometer
+        spec = sb.Spectrometer.from_serial_number("S03615")  # STS-UV-L-100-400-SMA
+        print(f'Spectrometer serial number: {spec.serial_number}')
+        
+        # Set integration time
+        spec.integration_time_micros(int_time * 1000)
+        
+        # Get spectrum
+        wavelengths, intensity = spec.spectrum()
+        
+        # Load and apply dark correction
+        try:
+            dark_noise = load_dark_noise(int_time)
+            dark_corrected = intensity - dark_noise
+        except Exception as e:
+            print(f"Warning: Could not apply dark correction - {str(e)}")
+            dark_corrected = intensity  # Use raw data if dark correction fails
+        
+        # Prepare metadata
+        metadata = {
+            'integration_time_ms': int_time,
+            'serial_number': spec.serial_number,
+            'dark_correction_applied': 'dark_noise' in locals()
+        }
+        
+        # Save data
+        save_scan_data(wavelengths, intensity, dark_corrected, metadata)
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error during scan: {str(e)}", file=sys.stderr)
+        return False
+    finally:
+        # Ensure spectrometer is closed
+        if 'spec' in locals():
+            spec.close()
 
-dark_noise = np.load(os.path.join(SCAM_PATH, "dark_noises", f"dark_{int_time}ms.npz"))['dark_avg']
-#  dark_noise = np.load(f"/Users/eulerlab/Github/SCAM/dark_noises/dark_{int_time}ms.npz")['dark_avg']
-
-# output_dir = f'/Users/eulerlab/Github/SCAM/GUI'
-print(os.path.join(GUI_PATH, 'scan_output.npz'))
-# print(os.getcwd())
-np.savez(os.path.join(GUI_PATH, 'scan_output.npz'),
-             wavelength=wavelengths, dark_avg=intensity-dark_noise)
+if __name__ == '__main__':
+    success = main()
+    sys.exit(0 if success else 1)
