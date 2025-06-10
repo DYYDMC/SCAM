@@ -1,9 +1,12 @@
+import datetime
+from datetime import datetime, timedelta
 import sys
 import subprocess
 import os
 import numpy as np
 
-
+from PyQt5.QtCore import QTimer, QDateTime
+from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout,
     QPushButton, QLabel, QFileDialog
@@ -12,9 +15,7 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import QLineEdit, QLabel
-from PyQt5.QtWidgets import QComboBox, QPushButton
-from PyQt5.QtWidgets import QLineEdit
+from PyQt5.QtWidgets import QLineEdit, QLabel, QComboBox, QPushButton
 
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
@@ -29,7 +30,9 @@ from ESP32_light_utils import initialize_connection, move_to_esp32
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Camera & Spectrometer GUI")
+        self.auto_scam_active = False
+        self.auto_scam_end_time = None
+        self.setWindowTitle("SCAM")
         self.setGeometry(100, 100, 1200, 800)
         self.initUI()
 
@@ -106,6 +109,16 @@ class MainWindow(QWidget):
         self.btn_auto_scam = QPushButton("Auto SCAM Start")
         self.btn_auto_scam.clicked.connect(self.start_auto_scam)
 
+        
+        self.label_duration = QLabel("Run For (minutes):")
+        self.input_duration = QLineEdit()
+        self.input_duration.setPlaceholderText("480")  # 8 hours default
+        
+        self.btn_stop_auto_scam = QPushButton("Stop Auto SCAM")
+        self.btn_stop_auto_scam.clicked.connect(self.stop_auto_scam)
+        self.btn_stop_auto_scam.setEnabled(False)
+        
+        self.label_status = QLabel("Auto SCAM: Inactive")
         # Add to left panel
         left_panel.addWidget(self.label_interval)
         left_panel.addWidget(self.input_interval)
@@ -114,6 +127,11 @@ class MainWindow(QWidget):
         left_panel.addWidget(self.label_twitch_down)
         left_panel.addWidget(self.input_twitch_down)
         left_panel.addWidget(self.btn_auto_scam)
+
+        left_panel.addWidget(self.label_duration)
+        left_panel.addWidget(self.input_duration)
+        left_panel.addWidget(self.btn_stop_auto_scam)
+        left_panel.addWidget(self.label_status)
 
 
         left_panel.addStretch()  # Move to the end
@@ -157,22 +175,111 @@ class MainWindow(QWidget):
         subprocess.run(["python3", os.path.join(SPEC_SCAN_PATH, "simple_scan.py"), int_time])
         self.load_plot()
     
+
     def start_auto_scam(self):
-        interval = self.input_interval.text().strip() or "30"
-        twitch_up = self.input_twitch_up.text().strip() or "0,10"
-        twitch_down = self.input_twitch_down.text().strip() or "0,-10"
-        shutter0 = self.input_shutter0.text().strip() or "100000"
-        shutter1 = self.input_shutter1.text().strip() or "1000000"
+        if self.auto_scam_active:
+            QMessageBox.information(self, "Info", "Auto SCAM is already running")
+            return
 
         try:
-            subprocess.run([
-                "python3", os.path.join(SPEC_SCAN_PATH, "repeated_cam_scan.py"),
-                interval, twitch_up, twitch_down, shutter0, shutter1
-            ], check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Auto SCAM failed: {e}")
+            # Get all parameters
+            interval_minutes = int(self.input_interval.text().strip() or "30")
+            twitch_up = tuple(map(int, (self.input_twitch_up.text().strip() or "0,10").split(',')))
+            twitch_down = tuple(map(int, (self.input_twitch_down.text().strip() or "0,-10").split(',')))
+            shutter0 = self.input_shutter0.text().strip() or "100000"
+            shutter1 = self.input_shutter1.text().strip() or "1000000"
+            
+            # Get time parameters
+            duration_minutes = int(self.input_duration.text().strip() or "480")
+            
+            
+            self.auto_scam_end_time = datetime.now() + timedelta(minutes=duration_minutes)
+            
+            # Initialize connection
+            initialize_connection()
+            move_to_esp32(0, 0)
+            
+            # Set up status
+            self.auto_scam_active = True
+            self.btn_auto_scam.setEnabled(False)
+            self.btn_stop_auto_scam.setEnabled(True)
+            self.update_status()
+            
+            # Set up timer
+            self.auto_scam_timer = QTimer()
+            self.auto_scam_timer.timeout.connect(lambda: self.auto_scam_iteration(twitch_up, twitch_down, shutter0, shutter1))
+            self.auto_scam_timer.start(interval_minutes * 60 * 1000)  # Convert to milliseconds
+            
+            # Run first iteration immediately
+            self.auto_scam_iteration(twitch_up, twitch_down, shutter0, shutter1)
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Auto SCAM initialization failed: {str(e)}")
+            self.stop_auto_scam()
 
+    def stop_auto_scam(self):
+        if hasattr(self, 'auto_scam_timer'):
+            self.auto_scam_timer.stop()
+        self.auto_scam_active = False
+        self.btn_auto_scam.setEnabled(True)
+        self.btn_stop_auto_scam.setEnabled(False)
+        self.update_status()
+        try:
+            close_connection()
+        except:
+            pass
 
+    def auto_scam_iteration(self, twitch_up, twitch_down, shutter0, shutter1):
+
+        if not self.auto_scam_active:
+            return
+        
+        # Check if we should stop
+        if datetime.now() >= self.auto_scam_end_time:
+            self.stop_auto_scam()
+            QMessageBox.information(self, "Info", "Auto SCAM completed scheduled duration")
+            return
+            
+        try:
+            self.update_status("Running scan...")
+            
+            # Take photo
+            self.take_photo()
+            
+            # Run spec scan
+            self.run_scan_spec()
+            
+            # Twitch movement with visual feedback
+            if hasattr(self, 'last_twitch_up'):
+                move_to_esp32(*twitch_down)
+                self.last_twitch_up = False
+                self.update_status("Moving down...")
+            else:
+                move_to_esp32(*twitch_up)
+                self.last_twitch_up = True
+                self.update_status("Moving up...")
+                
+            # Update status with next run time
+            next_run = datetime.now() + timedelta(
+                minutes=int(self.input_interval.text().strip() or "30"))
+            self.update_status(f"Next run at {next_run.strftime('%H:%M')}")
+            
+        except Exception as e:
+            self.update_status(f"Error: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Auto SCAM iteration failed: {str(e)}")
+
+    def update_status(self, message=None):
+        if message:
+            status = f"Auto SCAM: {message}"
+        elif self.auto_scam_active:
+            remaining = self.auto_scam_end_time - datetime.now()
+            hours, remainder = divmod(remaining.seconds, 3600)
+            minutes = remainder // 60
+            status = f"Auto SCAM: Active ({hours}h {minutes}m remaining)"
+        else:
+            status = "Auto SCAM: Inactive"
+            
+        self.label_status.setText(status)
         
     def load_images(self, path0=os.path.join(CAM_ROI_PATH,"roi_cam0.jpg"), path1=os.path.join(CAM_ROI_PATH,"roi_cam1.jpg")):
         for idx, (label, path) in enumerate(zip([self.label_cam0, self.label_cam1], [path0, path1])):
