@@ -87,6 +87,34 @@ class MainWindow(QWidget):
         left_panel.addWidget(self.label_shutter1)
         left_panel.addWidget(self.input_shutter1)
         left_panel.addWidget(self.btn_take_photo)
+        
+        # Interval input
+        self.label_interval = QLabel("Interval (minutes):")
+        self.input_interval = QLineEdit()
+        self.input_interval.setPlaceholderText("30")
+
+        # Twitch coordinates
+        self.label_twitch_up = QLabel("Twitch Up (x,y):")
+        self.input_twitch_up = QLineEdit()
+        self.input_twitch_up.setPlaceholderText("0,10")
+
+        self.label_twitch_down = QLabel("Twitch Down (x,y):")
+        self.input_twitch_down = QLineEdit()
+        self.input_twitch_down.setPlaceholderText("0,-10")
+
+        # Auto SCAM button
+        self.btn_auto_scam = QPushButton("Auto SCAM Start")
+        self.btn_auto_scam.clicked.connect(self.start_auto_scam)
+
+        # Add to left panel
+        left_panel.addWidget(self.label_interval)
+        left_panel.addWidget(self.input_interval)
+        left_panel.addWidget(self.label_twitch_up)
+        left_panel.addWidget(self.input_twitch_up)
+        left_panel.addWidget(self.label_twitch_down)
+        left_panel.addWidget(self.input_twitch_down)
+        left_panel.addWidget(self.btn_auto_scam)
+
 
         left_panel.addStretch()  # Move to the end
 
@@ -128,6 +156,23 @@ class MainWindow(QWidget):
             int_time = "100"
         subprocess.run(["python3", os.path.join(SPEC_SCAN_PATH, "simple_scan.py"), int_time])
         self.load_plot()
+    
+    def start_auto_scam(self):
+        interval = self.input_interval.text().strip() or "30"
+        twitch_up = self.input_twitch_up.text().strip() or "0,10"
+        twitch_down = self.input_twitch_down.text().strip() or "0,-10"
+        shutter0 = self.input_shutter0.text().strip() or "100000"
+        shutter1 = self.input_shutter1.text().strip() or "1000000"
+
+        try:
+            subprocess.run([
+                "python3", os.path.join(SPEC_SCAN_PATH, "repeated_cam_scan.py"),
+                interval, twitch_up, twitch_down, shutter0, shutter1
+            ], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Auto SCAM failed: {e}")
+
+
         
     def load_images(self, path0=os.path.join(CAM_ROI_PATH,"roi_cam0.jpg"), path1=os.path.join(CAM_ROI_PATH,"roi_cam1.jpg")):
         for idx, (label, path) in enumerate(zip([self.label_cam0, self.label_cam1], [path0, path1])):
@@ -136,7 +181,6 @@ class MainWindow(QWidget):
                 label.setPixmap(pixmap)
             else:
                 label.setText(f"{path} not found")
-
     
     def take_photo(self):
         shutter0 = self.input_shutter0.text().strip() or "100000"
@@ -146,7 +190,7 @@ class MainWindow(QWidget):
                 ["/bin/bash",os.path.join(CAM_ROI_PATH,'cam_take_photo.sh'), shutter0, shutter1],
                 check=True
             )
-            self.load_images(os.path.join(CAM_ROI_PATH,"cam0_0.jpg", os.path.join(CAM_ROI_PATH,"cam1_0.jpg")
+            self.load_images(os.path.join(CAM_ROI_PATH,"cam0_0.jpg"), os.path.join(CAM_ROI_PATH,"cam1_0.jpg"))
         except subprocess.CalledProcessError as e:
             print(f"Photo capture failed: {e}")
 
