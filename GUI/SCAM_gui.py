@@ -295,7 +295,13 @@ class MainWindow(QWidget):
             self.update_status(f"Photo error: {str(e)}")
             QMessageBox.critical(self, "Error", f"Photo sequence failed: {str(e)}")
 
-    
+    def stop_auto_scam(self):
+        if hasattr(self, 'auto_scam_timer'):
+            self.auto_scam_timer.stop()
+        self.auto_scam_active = False
+        self.btn_auto_scam.setEnabled(True)
+        self.btn_stop_auto_scam.setEnabled(False)
+        self.update_status()
     def auto_scam_iteration(self, twitch_up, twitch_down, shutter0, shutter1):
 
         if not self.auto_scam_active:
