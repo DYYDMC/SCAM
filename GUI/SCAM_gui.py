@@ -4,6 +4,8 @@ import sys
 import subprocess
 import os
 import numpy as np
+import time
+from data_handler import ScanDataHandler  # Import the new data handler
 
 from PyQt5.QtCore import QTimer, QDateTime
 from PyQt5.QtWidgets import QMessageBox
@@ -32,6 +34,9 @@ class MainWindow(QWidget):
         super().__init__()
         self.auto_scam_active = False
         self.auto_scam_end_time = None
+        self.photo_timer = QTimer()
+        self.scan_timer = QTimer()
+        self.data_handler = ScanDataHandler()  # Initialize data handler
         self.setWindowTitle("SCAM")
         self.setGeometry(100, 100, 1200, 800)
         self.initUI()
@@ -183,7 +188,7 @@ class MainWindow(QWidget):
 
         try:
             # Get all parameters
-            interval_minutes = int(self.input_interval.text().strip() or "30")
+            photo_interval_minutes = int(self.input_interval.text().strip() or "30")
             twitch_up = tuple(map(int, (self.input_twitch_up.text().strip() or "0,10").split(',')))
             twitch_down = tuple(map(int, (self.input_twitch_down.text().strip() or "0,-10").split(',')))
             shutter0 = self.input_shutter0.text().strip() or "100000"
@@ -191,7 +196,6 @@ class MainWindow(QWidget):
             
             # Get time parameters
             duration_minutes = int(self.input_duration.text().strip() or "480")
-            
             
             self.auto_scam_end_time = datetime.now() + timedelta(minutes=duration_minutes)
             
@@ -205,30 +209,93 @@ class MainWindow(QWidget):
             self.btn_stop_auto_scam.setEnabled(True)
             self.update_status()
             
-            # Set up timer
-            self.auto_scam_timer = QTimer()
-            self.auto_scam_timer.timeout.connect(lambda: self.auto_scam_iteration(twitch_up, twitch_down, shutter0, shutter1))
-            self.auto_scam_timer.start(interval_minutes * 60 * 1000)  # Convert to milliseconds
+            # Set up timers
+            self.photo_timer.timeout.connect(lambda: self.take_photos_sequence(twitch_up, twitch_down, shutter0, shutter1))
+            self.photo_timer.start(photo_interval_minutes * 60 * 1000)  # Convert to milliseconds
             
-            # Run first iteration immediately
-            self.auto_scam_iteration(twitch_up, twitch_down, shutter0, shutter1)
+            # Start scan sequence immediately
+            self.run_scan_sequence(twitch_up, twitch_down)
+            
+            # Run first photo sequence immediately
+            self.take_photos_sequence(twitch_up, twitch_down, shutter0, shutter1)
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Auto SCAM initialization failed: {str(e)}")
             self.stop_auto_scam()
-
-    def stop_auto_scam(self):
-        if hasattr(self, 'auto_scam_timer'):
-            self.auto_scam_timer.stop()
-        self.auto_scam_active = False
-        self.btn_auto_scam.setEnabled(True)
-        self.btn_stop_auto_scam.setEnabled(False)
-        self.update_status()
+    def run_scan_sequence(self, twitch_up, twitch_down):
+        """Run the spectrometer scan sequence (5 scans up, 5 scans down)"""
+        if not self.auto_scam_active:
+            return
+            
         try:
-            close_connection()
-        except:
-            pass
+            # Move up and scan 5 times
+            move_to_esp32(*twitch_up)
+            self.update_status("Scanning up position...")
+            for _ in range(5):
+                if not self.auto_scam_active:
+                    return
+                self.run_single_scan(twitch_up)
+                time.sleep(2)  # 2 second break between scans
+                
+            # Move down and scan 5 times
+            move_to_esp32(*twitch_down)
+            self.update_status("Scanning down position...")
+            for _ in range(5):
+                if not self.auto_scam_active:
+                    return
+                self.run_single_scan(twitch_down)
+                time.sleep(2)  # 2 second break between scans
+                
+            # Schedule next scan sequence in 1 minute (or adjust as needed)
+            self.scan_timer.singleShot(60000, lambda: self.run_scan_sequence(twitch_up, twitch_down))
+            
+        except Exception as e:
+            self.update_status(f"Scan error: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Scan sequence failed: {str(e)}")
 
+    def run_single_scan(self, coordinates):
+        """Run a single spectrometer scan and store the data"""
+        int_time = self.integration_input.text().strip() or "100"
+        try:
+            subprocess.run(["python3", os.path.join(SPEC_SCAN_PATH, "simple_scan.py"), int_time])
+            
+            # Load and store the scan data
+            data = np.load(os.path.join(GUI_PATH, "scan_output.npz"))
+            wavelengths = data["wavelength"]
+            intensity = data["dark_avg"]
+            
+            # Store in data handler
+            self.data_handler.add_scan(coordinates, wavelengths, intensity)
+            
+            # Update plot
+            self.load_plot()
+            
+        except Exception as e:
+            raise Exception(f"Spectrometer scan failed: {str(e)}")
+
+    def take_photos_sequence(self, twitch_up, twitch_down, shutter0, shutter1):
+        """Take photos in both positions"""
+        if not self.auto_scam_active:
+            return
+            
+        try:
+            # Move up and take photo
+            move_to_esp32(*twitch_up)
+            self.update_status("Taking photo up...")
+            self.take_photo()
+            self.data_handler.add_photo_time(time.time())
+            
+            # Move down and take photo
+            move_to_esp32(*twitch_down)
+            self.update_status("Taking photo down...")
+            self.take_photo()
+            self.data_handler.add_photo_time(time.time())
+            
+        except Exception as e:
+            self.update_status(f"Photo error: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Photo sequence failed: {str(e)}")
+
+    
     def auto_scam_iteration(self, twitch_up, twitch_down, shutter0, shutter1):
 
         if not self.auto_scam_active:
@@ -325,7 +392,6 @@ class MainWindow(QWidget):
             move_to_esp32(pan, tilt)
         except Exception as e:
             print(f"Error sending coordinates: {e}")
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
