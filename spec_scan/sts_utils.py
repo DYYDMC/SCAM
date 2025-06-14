@@ -48,3 +48,37 @@ def extract_integration_times(dark_noises_folder, output_file):
 
 # # Run the function
 # extract_integration_times(DARK_NOISES_PATH, output_file)
+
+def get_optimal_integration_time(all_int_times, spectrometer):
+    """
+    Finds the optimal integration time to achieve a spectral reading between 8000 and 15000.
+
+    Parameters:
+        all_int_times (list): List of available integration times in milliseconds.
+        spectrometer (object): Spectrometer device with a `set_integration_time` and `read` method.
+
+    Returns:
+        int: Optimal integration time in milliseconds.
+    """
+    sorted_times = sorted(all_int_times)
+    median_index = len(sorted_times) // 2
+    current_int = sorted_times[median_index]
+
+    while True:
+        spectrometer.set_integration_time(current_int*1e3)
+        _,raw_value = spectrometer.spectrum()
+        if np.max(raw_value) > 16300:
+            # check if the raw_value is too high
+           median_index -= 1
+        else:
+            if 8000 <= np.mean(raw_value) <= 15000:
+                return current_int
+            elif np.mean(raw_value) > 15000:
+                median_index -= 1
+            elif np.mean(raw_value) < 8000:
+                median_index += 1
+
+        if median_index < 0 or median_index >= len(sorted_times):
+            raise ValueError("No suitable integration time found.")
+# example usage:
+# optimal_time = get_optimal_integration_time(all_int_times, spec)
