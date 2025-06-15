@@ -38,18 +38,16 @@ os.makedirs(output_dir, exist_ok=True)
 # --- Scan Loop ---
 try:
     for v in range(V_RANGE[0], V_RANGE[1] + 1, STEP_DEG):
-        for h in range(H_RANGE[1], H_RANGE[0] - 1, -STEP_DEG):
-            move_to_esp32(h, v)
-            time.sleep(0.5)
-            if h == -1:
-                for cam_id, shutter in SHUTTER_SETTINGS.items():
-                    proc = subprocess.run(
-                        [PATHS['photo_script'], "capture_still", output_dir, str(v), cam_id, shutter],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
-                    if proc.returncode != 0:
-                        print(f"Photo capture failed at v={v}, cam={cam_id}: {proc.stderr.decode()}")
+        move_to_esp32(-1, v)
+        time.sleep(0.5)
+        for cam_id, shutter in SHUTTER_SETTINGS.items():
+            proc = subprocess.run(
+                [PATHS['photo_script'], "capture_still", output_dir, str(v), cam_id, shutter],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            if proc.returncode != 0:
+                print(f"Photo capture failed at v={v}, cam={cam_id}: {proc.stderr.decode()}")
 
 finally:
     close_connection()
