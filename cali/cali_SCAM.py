@@ -24,10 +24,10 @@ from ESP32_light_utils import initialize_connection, move_to_esp32, close_connec
 
 # --- Calibration Parameters ---
 SERIAL_NUMBER = 'S03615'
-INT_TIME_MS = 200  # in milliseconds
+INT_TIME_MS = 500  # in milliseconds
 STEP_DEG = 2
-V_RANGE = (-24, 36)
-H_RANGE = (-35, 35)
+V_RANGE = (-24, 24)
+H_RANGE = (-34, 34)
 SHUTTER_SETTINGS = {"0": "1000000", "1": "1000000"}
 
 # --- Initialization ---
@@ -67,16 +67,14 @@ try:
             corrected = spectrum - dark_noise
             cali_data['measurements'][(h, v)] = corrected
             time.sleep(0.5)
-
-            if h == 0:
-                for cam_id, shutter in SHUTTER_SETTINGS.items():
-                    proc = subprocess.run(
-                        [PATHS['photo_script'], "capture_still", output_dir, str(v), cam_id, shutter],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
-                    if proc.returncode != 0:
-                        print(f"Photo capture failed at v={v}, cam={cam_id}: {proc.stderr.decode()}")
+            for cam_id, shutter in SHUTTER_SETTINGS.items():
+                proc = subprocess.run(
+                    [PATHS['photo_script'], "capture_still", output_dir, f'h{h}v{v}', cam_id, shutter],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                if proc.returncode != 0:
+                    print(f"Photo capture failed at v={v}, cam={cam_id}: {proc.stderr.decode()}")
 
 finally:
     close_connection()
