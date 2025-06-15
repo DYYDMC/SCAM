@@ -27,7 +27,7 @@ SERIAL_NUMBER = 'S03615'
 INT_TIME_MS = 200  # in milliseconds
 STEP_DEG = 2
 V_RANGE = (-24, 36)
-H_RANGE = (-40, 40)
+H_RANGE = (-35, 35)
 SHUTTER_SETTINGS = {"0": "1000000", "1": "1000000"}
 
 # --- Initialization ---
