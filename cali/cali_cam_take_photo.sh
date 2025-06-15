@@ -5,13 +5,14 @@ CAMERA_CONFIG_PATH="${CAM_ROI_PATH}/camera_config.sh"
 source "$CAMERA_CONFIG_PATH"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
+
 capture_still() {
     local timestamp_folder=$1
     local index=$2
     local camera_id=$3
     local exposure_time=$4
-    local output_file="${SCRIPT_DIR}/${timestamp_folder}/cali_cam${camera_id}_vPos${index}.jpg"
-    
+    local output_file="${timestamp_folder}/cali_cam${camera_id}_vPos${index}.jpg"
+    echo $output_file
     ROI=$(set_roi "$camera_id")
     echo "$ROI"
     libcamera-still \
@@ -30,10 +31,12 @@ capture_still() {
         --lens-position $LENS \
         --shutter "$exposure_time" \
         --camera $camera_id \
+        -n 1 \
         --output "$output_file"
 }
 
 if [[ "$1" == "capture_still" ]]; then
+    echo 'HA'
     check_and_kill_libcamera
     capture_still "$2" "$3" "$4" "$5"
 fi
