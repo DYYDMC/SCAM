@@ -27,7 +27,7 @@ from sts_utils import get_optimal_integration_time
 all_int_times = np.load(os.path.join(PATHS['data'], 'all_int_times.npy'))
 # --- Calibration Parameters ---
 SERIAL_NUMBER = 'S03615'
-INT_TIME_MS = 500  # in milliseconds default
+INT_TIME_MS = 100  # in milliseconds default
 STEP_DEG = 2
 V_RANGE = (-24, 24)
 H_RANGE = (-34, 34)
@@ -62,12 +62,15 @@ scan_data = {
 print(scan_data['scan_positions'])
 # --- Scan Loop ---
 try:
+    previous_int_t = INT_TIME_MS * 1000  # Start with the default integration time
     for scan_pos in scan_data['scan_positions']:
-        h,v = scan_pos
+        h, v = scan_pos
         move_to_esp32(h, v)
         time.sleep(0.5)
-        tmp_int_t = get_optimal_integration_time(all_int_times, spec)
+        tmp_int_t = get_optimal_integration_time(all_int_times, spec, previous_ints=previous_int_t)
+        previous_int_t = tmp_int_t  # Use the current integration time for the next iteration
         time.sleep(0.5)
+        spec.integration_time_micros(tmp_int_t * 1000)
         _, spectrum = spec.spectrum()
         corrected = spectrum - dark_noise
         scan_data['measurements'][(h, v)] = {}
