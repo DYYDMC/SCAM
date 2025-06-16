@@ -5,7 +5,10 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 # --- Load Calibration Data ---
-folder = './timestamp_folder'  # replace with actual folder
+HOME = os.path.expanduser("~")
+SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+DATA_PATH = os.path.join(SCAM_PATH, 'data')
+folder = DATA_PATH  # replace with actual folder
 data = np.load(os.path.join(folder, 'spec_calibration.npz'), allow_pickle=True)
 v_min = data['v_min']
 v_max = data['v_max']
@@ -52,7 +55,7 @@ v_ticks = np.linspace(v_min, v_max, rows)
 h_ticks = np.linspace(h_min, h_max, cols)
 
 plt.figure(figsize=(8, 6))
-plt.imshow(rgb_image_normalized),extent=[h_min, h_max, v_max, v_min]
+plt.imshow(rgb_image_normalized,extent=[h_min, h_max, v_max, v_min])
 plt.title("RGB Inferred from Spectral Scan")
 plt.axis("off")
 plt.savefig(os.path.join(folder, 'rgb_inferred.png'), dpi=300)
