@@ -12,7 +12,7 @@ def load_darknoise_npz(file_path):
     dark_avg = data['dark_avg']
     return wavelength, dark_avg
 
-ACCEPT_SPEC_LOW = 2000 # the lower limit for the acceptable spectral reading
+ACCEPT_SPEC_LOW = 1600 # the lower limit for the acceptable spectral reading
 ACCEPT_SPEC_HIGH = 8000  # the upper limit for the acceptable spectral reading
 ACCEPT_MAX=16383
 def extract_integration_times(dark_noises_folder, output_file):
@@ -99,7 +99,10 @@ def get_optimal_integration_time(all_int_times, spectrometer,previous_ints=None)
         if median_index < 0 or median_index >= len(sorted_times):
             print("No suitable integration time found within the range.")
             print("MEASURE SOME MORE INTEGRATION TIMES")
-            return None
+            if median_index<0:
+                return sorted_times[0]
+            else:
+                return sorted_times[-1]
         else:
             # Update the current integration time
             current_int = sorted_times[median_index]

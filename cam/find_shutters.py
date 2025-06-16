@@ -66,7 +66,7 @@ def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_
 def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
     results = search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_guesses)
     np.save(os.path.join(output_dir, 'cam_shutter_ag.npy'), results)
-    np.save(os.path.join(DATA_PATH, "cam_shutter_ag.npy"), results)
+    # np.save(os.path.join(DATA_PATH, "cam_shutter_ag.npy"), results)
     return results
 if __name__ == "__main__":
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
