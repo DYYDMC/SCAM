@@ -43,10 +43,10 @@ os.makedirs(output_dir, exist_ok=True)
 # Record dark noise for each integration time
 for int_time in integration_times_ms:
     if int_time not in measured_int_times:
-        print(f"Measuring dark noise at {int_time} ms...")
         # Validate integration time before setting it
         if MIN_INT_TIME <= int_time :
-            spec.integration_time_micros(int_time)
+            print(f"Measuring dark noise at {int_time} ms...")
+            spec.integration_time_micros(int_time*1e3)
         else:
             print(f"Integration time {int_time} ms is out of range. Skipping...")
             continue
