@@ -51,10 +51,10 @@ def save_scan_data(wavelengths, intensity, dark_corrected, metadata=None):
 def main():
     try:
         # Get integration time from command line
-        int_time = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+        int_time = float(sys.argv[1]) if len(sys.argv) > 1 else 100
         
         # Initialize spectrometer
-        spec = sb.Spectrometer.from_serial_number("S03615")  # STS-UV-L-100-400-SMA
+        spec = sb.Spectrometer.from_serial_number("S03615")
         print(f'Spectrometer serial number: {spec.serial_number}')
         
         # Set integration time
