@@ -53,6 +53,7 @@ output_file = os.path.join(DATA_PATH,'all_int_times.npy')
 # # Run the function
 # extract_integration_times(DARK_NOISES_PATH, output_file)
 
+
 def get_optimal_integration_time(all_int_times, spectrometer):
     """
     Finds the optimal integration time to achieve a spectral reading between 8000 and 15000.
