@@ -76,6 +76,7 @@ try:
         # store the measurement for the current timestamp and position
         # easier modification for one position multiple scans : same pos different timestamps
         ts = int(time.time())
+        scan_data['measurements'][ts] = {}
         scan_data['measurements'][ts]['pos']=(h,v)
         scan_data['measurements'][ts]['clean'] = corrected
         scan_data['measurements'][ts]['int_t'] = tmp_int_t
