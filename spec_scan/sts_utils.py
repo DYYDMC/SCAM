@@ -31,7 +31,7 @@ def extract_integration_times(dark_noises_folder, output_file):
                 integration_times.add(time_s)
             except ValueError:
                 continue  # Skip files with invalid format
-    print(len(integration_times))
+    # print(len(integration_times))
     # Convert the set to a sorted 1D array
     integration_times_array = np.array(sorted(integration_times))
     print(integration_times_array)
@@ -70,7 +70,7 @@ def get_optimal_integration_time(all_int_times, spectrometer):
     current_int = sorted_times[median_index]
 
     while True:
-        spectrometer.set_integration_time(current_int*1e3)
+        spectrometer.integration_time_micros(current_int*1e3)
         _,raw_value = spectrometer.spectrum()
         if np.max(raw_value) > 16300:
             # check if the raw_value is too high
