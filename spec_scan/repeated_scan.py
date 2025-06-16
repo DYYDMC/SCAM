@@ -66,17 +66,15 @@ try:
         h,v = scan_pos
         move_to_esp32(h, v)
         time.sleep(0.5)
-        optimal_time = get_optimal_integration_time(all_int_times, spec)
-        for h in range(H_RANGE[1], H_RANGE[0] - 1, -STEP_DEG):
-            move_to_esp32(h, v)
-            time.sleep(0.5)
-            get_optimal_integration_time
-            _, spectrum = spec.spectrum()
-            corrected = spectrum - dark_noise
-            scan_data['measurements'][(h, v)] = {}
-            scan_data['measurements'][(h, v)]['ts'] = int(time.time())
-            scan_data['measurements'][(h, v)]['clean'] = corrected
-            time.sleep(0.5)
+        tmp_int_t = get_optimal_integration_time(all_int_times, spec)
+        time.sleep(0.5)
+        _, spectrum = spec.spectrum()
+        corrected = spectrum - dark_noise
+        scan_data['measurements'][(h, v)] = {}
+        scan_data['measurements'][(h, v)]['ts'] = int(time.time())
+        scan_data['measurements'][(h, v)]['clean'] = corrected
+        scan_data['measurements'][(h, v)]['int_t'] = tmp_int_t
+        time.sleep(0.5)
 
 finally:
     close_connection()
