@@ -62,6 +62,7 @@ def main():
         
         # Get spectrum
         wavelengths, intensity = spec.spectrum()
+        print('the maximum of measured raw values: ',np.max(intensity))
         
         # Load and apply dark correction
         try:
