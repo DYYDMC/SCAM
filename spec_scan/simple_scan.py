@@ -9,11 +9,11 @@ from datetime import datetime
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 GUI_PATH = os.path.join(SCAM_PATH, 'GUI')
-DARK_NOISE_PATH = os.path.join(SCAM_PATH, "dark_noises")
+DARK_NOISES_PATH = os.path.join(SCAM_PATH, "dark_noises")
 
 def load_dark_noise(int_time):
     """Load dark noise for given integration time"""
-    dark_file = os.path.join(DARK_NOISE_PATH, f"dark_{int_time}ms.npz")
+    dark_file = os.path.join(DARK_NOISES_PATH, f"dark_{int_time}ms.npz")
     if not os.path.exists(dark_file):
         raise FileNotFoundError(f"Dark noise file not found for {int_time}ms")
     return np.load(dark_file)['dark_avg']
