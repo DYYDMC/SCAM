@@ -28,7 +28,7 @@ if response.strip().upper() != 'Y':
     exit(1)
 
 # Define integration times (in milliseconds)
-integration_times_ms = [ii for ii in range(1,1001)]
+integration_times_ms = [ii for ii in range(1,1001,10)]
 # [ii for ii in range(1000,10000,50)]
 # [ii for ii in range(10000,100000, 100)]
 measured_int_times = np.load(os.path.join(DATA_PATH, 'all_int_times.npy'))
