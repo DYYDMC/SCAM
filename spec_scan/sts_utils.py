@@ -1,6 +1,11 @@
 import numpy as np
 import os
 
+HOME = os.path.expanduser("~")
+SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+DARK_NOISES_PATH = os.path.join(SCAM_PATH,'dark_noises')
+DATA_PATH = os.path.join(SCAM_PATH, 'data')
+
 def load_darknoise_npz(file_path):
     data = np.load(file_path)
     wavelength = data['wavelength']
@@ -13,11 +18,11 @@ def extract_integration_times(dark_noises_folder, output_file):
     # Extract integration times from filenames
     for filename in os.listdir(dark_noises_folder):
         if filename.startswith("dark_") and filename.endswith(".npz"):
-            print(filename)
+            # print(filename)
             try:
                 # file format: "dark_100ms.npz"
                 if filename.startswith("dark_") and filename.endswith("ms.npz"):
-                    time_str = filename[5:-7]  # Remove "dark_" prefix and "ms.npz" suffix
+                    time_str = filename[5:-6]  # Remove "dark_" prefix and "ms.npz" suffix
                     try:
                         time_s = float(time_str)  # Convert to float (seconds)
                         integration_times.add(time_s)
@@ -26,7 +31,7 @@ def extract_integration_times(dark_noises_folder, output_file):
                 integration_times.add(time_s)
             except ValueError:
                 continue  # Skip files with invalid format
-
+    print(len(integration_times))
     # Convert the set to a sorted 1D array
     integration_times_array = np.array(sorted(integration_times))
     print(integration_times_array)
@@ -39,11 +44,11 @@ def extract_integration_times(dark_noises_folder, output_file):
     print(f"Integration times saved to {output_file}")
 # # how to use this function
 # # Define paths
-# HOME = os.path.expanduser("~")
-# SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
-# DARK_NOISES_PATH = os.path.join(SCAM_PATH,'dark_noises')
-# DATA_PATH = os.path.join(SCAM_PATH, 'data')
-# output_file = os.path.join(DATA_PATH,'all_int_times.npy')
+HOME = os.path.expanduser("~")
+SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+DARK_NOISES_PATH = os.path.join(SCAM_PATH,'dark_noises')
+DATA_PATH = os.path.join(SCAM_PATH, 'data')
+output_file = os.path.join(DATA_PATH,'all_int_times.npy')
 
 # # Run the function
 # extract_integration_times(DARK_NOISES_PATH, output_file)
