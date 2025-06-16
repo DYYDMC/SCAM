@@ -28,9 +28,12 @@ if response.strip().upper() != 'Y':
     exit(1)
 
 # Define integration times (in milliseconds)
-integration_times_ms = np.linspace(0.01, 0.99, 99)
+integration_times_ms = [ii for ii in range(1,1001,10)]
+# [ii for ii in range(1000,10000,50)]
+# [ii for ii in range(10000,100000, 100)]
 measured_int_times = np.load(os.path.join(DATA_PATH, 'all_int_times.npy'))
 ## MEASURED in ms
+# np.linspace(0.01, 0.99, 99)
 # [100, 200, 300, 400, 500, 800, 1000, 1200, 1500, 1800, 2000, 2500, 3000]
 # [10, 20, 40, 80]
 # [100, 200, 300, 400, 500, 800, 1000, 1200, 1500, 1800, 2000, 2500, 3000, 4000, 5000, 8000, 10000]
