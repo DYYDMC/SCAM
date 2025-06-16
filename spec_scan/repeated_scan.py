@@ -31,6 +31,7 @@ INT_TIME_MS = 100  # in milliseconds init integration time
 STEP_DEG = 2
 V_RANGE = (-24, 24)
 H_RANGE = (-34, 34)
+num_scan_perPos = 1
 
 # --- Initialization ---
 initialize_connection()
@@ -56,6 +57,7 @@ scan_data = {
     'h_max': H_RANGE[1],
     'step_size': STEP_DEG,
     'scan_positions' : [(0,v) for v in [V_RANGE[0],0,V_RANGE[1]]],
+    'num_scan_perPos': num_scan_perPos,
     'measurements': {},
 }
 print(scan_data['scan_positions'])
@@ -70,17 +72,21 @@ try:
         previous_int_t = tmp_int_t  # Use the current integration time for the next iteration
         time.sleep(0.5)
         spec.integration_time_micros(tmp_int_t * 1000)
-        _, spectrum = spec.spectrum()
-        corrected = spectrum - dark_noise
         
-        # store the measurement for the current timestamp and position
-        # easier modification for one position multiple scans : same pos different timestamps
-        ts = int(time.time())
-        scan_data['measurements'][ts] = {}
-        scan_data['measurements'][ts]['pos']=(h,v)
-        scan_data['measurements'][ts]['clean'] = corrected
-        scan_data['measurements'][ts]['int_t'] = tmp_int_t
-        time.sleep(0.5)
+        for scan_num in range(num_scan_perPos):
+            # take a measurement
+            print(f"Taking measurement at position (h={h}, v={v}), scan number {scan_num + 1}/{num_scan_perPos}")
+            _, spectrum = spec.spectrum()
+            corrected = spectrum - dark_noise
+            
+            # store the measurement for the current timestamp and position
+            # easier modification for one position multiple scans : same pos different timestamps
+            ts = int(time.time())
+            scan_data['measurements'][ts] = {}
+            scan_data['measurements'][ts]['pos']=(h,v)
+            scan_data['measurements'][ts]['clean'] = corrected
+            scan_data['measurements'][ts]['int_t'] = tmp_int_t
+            time.sleep(0.5)
 
 finally:
     close_connection()
