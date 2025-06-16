@@ -41,10 +41,9 @@ def extract_integration_times(dark_noises_folder, output_file):
 # # Define paths
 # HOME = os.path.expanduser("~")
 # SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
-# DARK_NOISES_PATH = os.path.join(SCAM_PATH,'dark_noises')
 # DATA_PATH = os.path.join(SCAM_PATH, 'data')
+# DARK_NOISES_PATH = os.path.join(SCAM_PATH,'dark_noises')
 # output_file = os.path.join(DATA_PATH,'all_int_times.npy')
-
 # # Run the function
 # extract_integration_times(DARK_NOISES_PATH, output_file)
 
