@@ -8,6 +8,7 @@ from datetime import datetime
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CAM_PATH = os.path.join(SCAM_PATH, 'cam')
+DATA_PATH = os.path.join(SCAM_PATH, 'data')
 
 def call_bash_script(camera_id, shutter, analoggain):
     # Ensure the data directory exists
@@ -87,7 +88,7 @@ def main():
     output_file = os.path.join(output_dir, 'cam_shutter_ag.npy')
     np.save(output_file,results)
     
-    cam_config_file = os.path.join(CAM_PATH, "cam_shutter_ag.npy")
+    cam_config_file = os.path.join(DATA_PATH, "cam_shutter_ag.npy")
     np.save(cam_config_file,results)
 if __name__ == "__main__":
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
