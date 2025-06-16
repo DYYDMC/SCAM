@@ -2,7 +2,7 @@ import subprocess
 import os
 import numpy as np
 import cv2
-
+from datetime import datetime
 
 # Define paths globally
 HOME = os.path.expanduser("~")
@@ -14,7 +14,7 @@ def call_bash_script(camera_id, shutter, analoggain):
     os.makedirs(CAM_PATH, exist_ok=True)
     
     # Construct the output image filename
-    img_filename = os.path.join(CAM_PATH, f"cam{camera_id}_shutter{shutter}_ag{analoggain}.jpg")
+    img_filename = os.path.join(output_dir, f"cam{camera_id}_shutter{shutter}_ag{analoggain}.jpg")
     
     ## Call the bash script
     # bash takes:
@@ -44,31 +44,50 @@ def analyze_image(img_filename):
     
     # Define thresholds for overexposure and underexposure
     overexposed_threshold = 240  # Example threshold for overexposure
-    underexposed_threshold = 15  # Example threshold for underexposure
+    underexposed_threshold = 50  # Example threshold for underexposure
     
     if brightness > overexposed_threshold:
         return "overexposed"
     elif brightness < underexposed_threshold:
         return "underexposed"
     else:
-        return "properly exposed"
+        return "ok"
 
 def main():
-    # Example parameters
-    camera_id = 0
-    shutter = 1000  # in microseconds
-    analoggain = 2.0  # gain value
-    
-    try:
-        # Call the bash script and get the image filename
-        img_filename = call_bash_script(camera_id, shutter, analoggain)
-        
-        # Analyze the image
-        exposure_status = analyze_image(img_filename)
-        print(f"The image {img_filename} is {exposure_status}.")
-    
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    # Define ranges for parameters
+    analoggain = 1.2 # Analog gain from 1.2 to 8 with 0.4 spacing
+    camera_ids = [0, 1]  # Camera IDs
+    shutter_range = range(int(1e3*1e3), int(1033e3), int(10e3))  # Shutter speed from 33,000 to 1,033,000 in steps of 10,000
+
+    # Initialize results dictionary
+    results = {}
+
+    for camera_id in camera_ids:
+        for shutter in shutter_range:
+            try:
+                # Call the bash script and get the image filename
+                img_filename = call_bash_script(camera_id, shutter, analoggain)
+                
+                # Analyze the image
+                exposure_status = analyze_image(img_filename)
+                if exposure_status in ["overexposed", "underexposed"]:
+                    os.remove(img_filename)  # Delete the image file
+                    print(f"The image {img_filename} is {exposure_status}. Moving to the next combination.")
+                    continue  # Skip to the next combination
+                else:
+                    print(f"The image {img_filename} is {exposure_status}.")
+                    # Save the camera_id, shutter, and analoggain as a dictionary
+                    if camera_id not in results:
+                        results[camera_id] = []
+                    results[camera_id].append((shutter, analoggain))
+                    # Stop the current camera_id loop and move to the next
+                    break
+            
+            except Exception as e:
+                print(f"An error occurred for camera_id={camera_id}, shutter={shutter}, analoggain={analoggain}: {e}")
 
 if __name__ == "__main__":
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_dir = os.path.join(CAM_PATH, timestamp)
+    os.makedirs(output_dir, exist_ok=True)
     main()

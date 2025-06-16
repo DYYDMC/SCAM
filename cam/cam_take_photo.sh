@@ -46,4 +46,5 @@ libcamera-still \
     --analoggain $again \
     --camera $camera_id \
     -n 1 \
+    -t 3000 \
     --output "$output_file"
