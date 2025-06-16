@@ -27,7 +27,7 @@ from sts_utils import get_optimal_integration_time
 all_int_times = np.load(os.path.join(PATHS['data'], 'all_int_times.npy'))
 # --- Calibration Parameters ---
 SERIAL_NUMBER = 'S03615'
-INT_TIME_MS = 100  # in milliseconds default
+INT_TIME_MS = 100  # in milliseconds init integration time
 STEP_DEG = 2
 V_RANGE = (-24, 24)
 H_RANGE = (-34, 34)
@@ -49,7 +49,6 @@ os.makedirs(output_dir, exist_ok=True)
 
 scan_data = {
     'serial_number': SERIAL_NUMBER,
-    'integration_time': INT_TIME_MS * 1000,
     'wavelengths': wavelengths,
     'v_min': V_RANGE[0],
     'v_max': V_RANGE[1],
@@ -66,17 +65,20 @@ try:
     for scan_pos in scan_data['scan_positions']:
         h, v = scan_pos
         move_to_esp32(h, v)
-        time.sleep(0.5)
+        time.sleep(2)
         tmp_int_t = get_optimal_integration_time(all_int_times, spec, previous_ints=previous_int_t)
         previous_int_t = tmp_int_t  # Use the current integration time for the next iteration
         time.sleep(0.5)
         spec.integration_time_micros(tmp_int_t * 1000)
         _, spectrum = spec.spectrum()
         corrected = spectrum - dark_noise
-        scan_data['measurements'][(h, v)] = {}
-        scan_data['measurements'][(h, v)]['ts'] = int(time.time())
-        scan_data['measurements'][(h, v)]['clean'] = corrected
-        scan_data['measurements'][(h, v)]['int_t'] = tmp_int_t
+        
+        # store the measurement for the current timestamp and position
+        # easier modification for one position multiple scans : same pos different timestamps
+        ts = int(time.time())
+        scan_data['measurements'][ts]['pos']=(h,v)
+        scan_data['measurements'][ts]['clean'] = corrected
+        scan_data['measurements'][ts]['int_t'] = tmp_int_t
         time.sleep(0.5)
 
 finally:
