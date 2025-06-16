@@ -10,26 +10,13 @@ SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CAM_PATH = os.path.join(SCAM_PATH, 'cam')
 DATA_PATH = os.path.join(SCAM_PATH, 'data')
 
-def call_bash_script(camera_id, shutter, analoggain):
-    # Ensure the data directory exists
-    os.makedirs(CAM_PATH, exist_ok=True)
-    
-    # Construct the output image filename
+def call_bash_script(camera_id, shutter, analoggain, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
     img_filename = os.path.join(output_dir, f"cam{camera_id}_shutter{shutter}_ag{analoggain}.jpg")
-    
-    ## Call the bash script
-    # bash takes:
-    # $1 absolute path of the output image file as the first argument
-    # $2 camera ID as the second argument
-    # $3 shutter speed in microseconds as the third argument
-    # $4 analog gain as the fourth argument
-    subprocess.run(["bash", os.path.join(CAM_PATH,"cam_take_photo.sh"),img_filename,
+    subprocess.run(["bash", os.path.join(CAM_PATH,"cam_take_photo.sh"), img_filename,
                     str(camera_id), str(shutter), str(analoggain)], check=True)
-    
-    # Wait for the image file to be generated
     if not os.path.exists(img_filename):
-        raise FileNotFoundError(f"Image file {img_filename} not found after calling the bash script.")
-    
+        raise FileNotFoundError(f"{img_filename} not created.")
     return img_filename
 
 def analyze_image(img_filename):
@@ -53,45 +40,39 @@ def analyze_image(img_filename):
         return "underexposed"
     else:
         return "ok"
-
-def main():
-    # Define ranges for parameters
-    analoggain = 1.2 # Analog gain from 1.2 to 8 with 0.4 spacing
-    camera_ids = [0, 1]  # Camera IDs
-    shutter_range = range(int(33*1e3), int(1033e3), int(50e3))  # Shutter speed from 33,000 to 1,033,000 in steps of 10,000
-
-    # Initialize results dictionary
+def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
     results = []
-
     for camera_id in camera_ids:
         found_ok = False
-        for analoggain in [ii/10.0 for ii in range(12,81,4)]:
+        for analoggain in again_range:
             if found_ok:
                 break
             for shutter in shutter_range:
-                try:
-                    img_filename = call_bash_script(camera_id, shutter, analoggain)
-                    exposure_status = analyze_image(img_filename)
-                    if exposure_status in ["overexposed", "underexposed"]:
-                        os.remove(img_filename)
-                        print(f"The image {img_filename} is {exposure_status}. Moving to the next combination.")
+                if initial_guesses:
+                    if (camera_id, analoggain, shutter) not in initial_guesses:
                         continue
-                    else:
-                        print(f"The image {img_filename} is {exposure_status}.")
-                        results.append([camera_id,analoggain,shutter])
+                try:
+                    img_filename = call_bash_script(camera_id, shutter, analoggain, output_dir)
+                    exposure_status = analyze_image(img_filename)
+                    if exposure_status == "ok":
+                        results.append([camera_id, analoggain, shutter])
                         found_ok = True
                         break
+                    os.remove(img_filename)
                 except Exception as e:
-                    print(f"Error: {e}")
-                    print(f"An error occurred for camera_id={camera_id}, shutter={shutter}, analoggain={analoggain}: {e}")
-                    
-    output_file = os.path.join(output_dir, 'cam_shutter_ag.npy')
-    np.save(output_file,results)
-    
-    cam_config_file = os.path.join(DATA_PATH, "cam_shutter_ag.npy")
-    np.save(cam_config_file,results)
+                    print(f"Failed: cam{camera_id}, shutter={shutter}, again={analoggain} -> {e}")
+    return results
+
+def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
+    results = search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_guesses)
+    np.save(os.path.join(output_dir, 'cam_shutter_ag.npy'), results)
+    np.save(os.path.join(DATA_PATH, "cam_shutter_ag.npy"), results)
+    return results
 if __name__ == "__main__":
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     output_dir = os.path.join(CAM_PATH, timestamp)
-    os.makedirs(output_dir, exist_ok=True)
-    main()
+    camera_ids = [0, 1]
+    shutter_range = range(int(33e3), int(1033e3), int(50e3))
+    again_range = [round(ii / 10.0, 1) for ii in range(12, 81, 4)]
+    initial_guesses = None
+    main(camera_ids, shutter_range, again_range, output_dir, initial_guesses)
