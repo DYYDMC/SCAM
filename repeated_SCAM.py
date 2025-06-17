@@ -32,6 +32,7 @@ STEP_DEG = 2
 V_RANGE = (-24, 24)
 H_RANGE = (-34, 34)
 num_scan_perPos = 1
+num_iterations = 1  # number of iterations for 3-pos-scan
 
 # --- Initialization ---
 initialize_connection()
@@ -64,40 +65,41 @@ print(scan_data['scan_positions'])
 # --- Scan Loop ---
 try:
     previous_int_t = INT_TIME_MS * 1000  # Start with the default integration time
-    for scan_pos in scan_data['scan_positions']:
-        h, v = scan_pos
-        move_to_esp32(h, v)
-        time.sleep(2)
-        tmp_int_t = get_optimal_integration_time(all_int_times, spec, previous_ints=previous_int_t)
-        previous_int_t = tmp_int_t  # Use the current integration time for the next iteration
-        time.sleep(0.5)
-        spec.integration_time_micros(tmp_int_t * 1000)
-        
-        for scan_num in range(num_scan_perPos):
-            # take a measurement
-            print(f"Taking measurement at position (h={h}, v={v}), scan number {scan_num + 1}/{num_scan_perPos}")
-            _, spectrum = spec.spectrum()
-            corrected = spectrum - dark_noise
-            
-            # store the measurement for the current timestamp and position
-            # easier modification for one position multiple scans : same pos different timestamps
-            ts = int(time.time())
-            scan_data['measurements'][ts] = {}
-            scan_data['measurements'][ts]['pos']=(h,v)
-            scan_data['measurements'][ts]['clean'] = corrected
-            scan_data['measurements'][ts]['int_t'] = tmp_int_t
+    for ii in range(num_iterations):
+        for scan_pos in scan_data['scan_positions']:
+            h, v = scan_pos
+            move_to_esp32(h, v)
+            time.sleep(2)
+            tmp_int_t = get_optimal_integration_time(all_int_times, spec, previous_ints=previous_int_t)
+            previous_int_t = tmp_int_t  # Use the current integration time for the next iteration
             time.sleep(0.5)
+            spec.integration_time_micros(tmp_int_t * 1000)
+            
+            for scan_num in range(num_scan_perPos):
+                # take a measurement
+                print(f"Taking measurement at position (h={h}, v={v}), scan number {scan_num + 1}/{num_scan_perPos}")
+                _, spectrum = spec.spectrum()
+                corrected = spectrum - dark_noise
+                
+                # store the measurement for the current timestamp and position
+                # easier modification for one position multiple scans : same pos different timestamps
+                ts = int(time.time())
+                scan_data['measurements'][ts] = {}
+                scan_data['measurements'][ts]['pos']=(h,v)
+                scan_data['measurements'][ts]['clean'] = corrected
+                scan_data['measurements'][ts]['int_t'] = tmp_int_t
+                time.sleep(0.5)
 
-        ## start to take camera img
-        # load the cam_shutter_again
-        cam_shutter_ag= np.load(os.path.join(PATHS['cam'],'cam_shutter_ag.npy'))
-        os.makedirs(output_dir, exist_ok=True)
-        for cam in [0,1]:
-            shutter = cam_shutter_ag[cam,1]
-            analoggain = cam_shutter_ag[cam,2]
-            img_filename = os.path.join(output_dir, f"cam{cam}_shutter{shutter}_ag{analoggain}.jpg")
-            subprocess.run(["bash", os.path.join(PATHS['cam'],"cam_take_photo.sh"), img_filename,
-                            str(cam), str(shutter), str(analoggain)], check=True)
+            ## start to take camera img
+            # load the cam_shutter_again
+            cam_shutter_ag= np.load(os.path.join(PATHS['cam'],'cam_shutter_ag.npy'))
+            os.makedirs(output_dir, exist_ok=True)
+            for cam in [0,1]:
+                shutter = cam_shutter_ag[cam,1]
+                analoggain = cam_shutter_ag[cam,2]
+                img_filename = os.path.join(output_dir, f"cam{cam}_shutter{shutter}_ag{analoggain}.jpg")
+                subprocess.run(["bash", os.path.join(PATHS['cam'],"cam_take_photo.sh"), img_filename,
+                                str(cam), str(shutter), str(analoggain)], check=True)
         
 
 finally:
