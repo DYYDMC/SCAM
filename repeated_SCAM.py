@@ -93,12 +93,13 @@ try:
 
             ## start to take camera img
             # load the cam_shutter_again
+            
             cam_shutter_ag= np.load(os.path.join(PATHS['cam'],'cam_shutter_ag.npy'))
             os.makedirs(output_dir, exist_ok=True)
             for cam in [0,1]:
                 shutter = cam_shutter_ag[cam,1]
                 analoggain = cam_shutter_ag[cam,2]
-                img_filename = os.path.join(output_dir, f"cam{cam}_shutter{shutter}_ag{analoggain}.jpg")
+                img_filename = os.path.join(output_dir, f"cam{cam}_shutter{shutter}_ag{analoggain}_iter{ii}_h{h}v{v}.jpg")
                 subprocess.run(["bash", os.path.join(PATHS['cam'],"cam_take_photo.sh"), img_filename,
                                 str(cam), str(shutter), str(analoggain)], check=True)
         
