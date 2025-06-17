@@ -88,7 +88,6 @@ def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_
 
     return results
 
-
 def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
     os.makedirs(output_dir, exist_ok=True)
 
@@ -100,10 +99,10 @@ def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=Non
     local_to_save = np.copy(to_save)
     global_to_save = np.copy(local_to_save)
     # save one in the cam_path under the timestamp folder
-    np.save(os.path.join(output_dir, 'cam_shutter_ag.npy'), local_to_save)
+    np.save(os.path.join(output_dir, 'cam_ag_shutter.npy'), local_to_save)
     
     # save/overwrite one in the data folder for the global access i.e. exposure time adapts
-    np.save(os.path.join(DATA_PATH, 'cam_shutter_ag.npy'), global_to_save)
+    np.save(os.path.join(DATA_PATH, 'cam_ag_shutter.npy'), global_to_save)
 
     return results
 if __name__ == "__main__":
