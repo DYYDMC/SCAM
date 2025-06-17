@@ -46,7 +46,7 @@ def analyze_image(img_filename):
 def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
     min_shutter, max_shutter, step_shutter = int(33e3), int(1033e3), int(50e3)
     min_again, max_again, step_again = 1.2, 8.1, 0.4
-    search_range_shutter = list(range(int(33e3), int(1033e3), int(50e3)))
+    search_range_shutter = list(range(min_shutter, max_shutter, step_shutter))
     search_range_again = np.arange(min_again, max_again, step_again).round(1).tolist()
 
     camera_id = int(camera_id)
@@ -54,9 +54,10 @@ def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
     ag, shutter = initial_tuple
     results = []
 
-
     def update_range(search_range, val, direction):
         if direction == "increase":
+            print('increase the range!!!')
+            print([x for x in search_range if x > val])
             return [x for x in search_range if x > val]
         elif direction == "decrease":
             return [x for x in search_range if x < val]
