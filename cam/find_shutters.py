@@ -78,7 +78,6 @@ def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_
                     if analyze_image(img_filename) == "ok":
                         results[camera_id] = (shutter, analoggain)
                         found[camera_id] = True
-                        os.remove(img_filename)
                         break
                     else:
                         os.remove(img_filename)
