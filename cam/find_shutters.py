@@ -52,7 +52,6 @@ def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_
                 if analyze_image(img_filename) == "ok":
                     results[camera_id] = (shutter, analoggain)
                     found[camera_id] = True
-                    os.remove(img_filename)
                 else:
                     os.remove(img_filename)
             except Exception as e:
@@ -99,8 +98,10 @@ def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=Non
 
     # Convert dict to sorted array for consistent storage
     to_save = np.array([[cam_id, ag, sh] for cam_id, (sh, ag) in sorted(results.items())])
-    np.save(os.path.join(output_dir, 'cam_shutter_ag.npy'), to_save)
-    np.save(os.path.join(DATA_PATH, 'cam_shutter_ag.npy'), to_save)
+    local_to_save = np.copy(to_save)
+    global_to_save = np.copy(local_to_save)
+    np.save(os.path.join(output_dir, 'cam_shutter_ag.npy'), local_to_save)
+    np.save(os.path.join(DATA_PATH, 'cam_shutter_ag.npy'), global_to_save)
 
     return results
 if __name__ == "__main__":
