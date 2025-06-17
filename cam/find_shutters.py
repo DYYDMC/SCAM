@@ -26,9 +26,9 @@ def analyze_image(img_filename):
     
     # Calculate the brightness of the image
     if 'cam0' in img_filename:
-        brightness = np.mean(img[100:-100,:-500,1])  # Convert to grayscale and calculate mean brightness
+        brightness = np.mean(img[500:-500,:-1296,1])  # Convert to grayscale and calculate mean brightness
     if 'cam1' in img_filename:
-        brightness = np.mean(img[100:-100,:-500,0])  # Convert to grayscale and calculate mean brightness
+        brightness = np.mean(img[500:-500,:-1296,0])  # Convert to grayscale and calculate mean brightness
     
     # Define thresholds for overexposure and underexposure
     overexposed_threshold = 240  # Example threshold for overexposure
