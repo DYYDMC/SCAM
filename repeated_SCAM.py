@@ -32,8 +32,8 @@ INT_TIME_MS = 100  # in milliseconds init integration time
 STEP_DEG = 2
 V_RANGE = (-24, 24)
 H_RANGE = (-34, 34)
-num_scan_perPos = 5
-num_iterations = 100 # number of iterations for 3-pos-scan
+num_scan_perPos = 1
+num_iterations = 1 # number of iterations for 3-pos-scan
 
 # --- Initialization ---
 initialize_connection()
@@ -70,7 +70,7 @@ for scan_pos in scan_data['scan_positions']:
     move_to_esp32(h, v)
     time.sleep(2)
     for cam in [0,1]:
-        pos2shutters[(cam,h,v)] = adaptive_search_exposure(0,output_dir)
+        pos2shutters[(cam,h,v)] = adaptive_search_exposure(cam,output_dir)
         print(f"Camera {cam} shutter settings for position (h={h}, v={v}): {pos2shutters[(cam,h,v)]}")
 
 # --- Scan Loop ---
@@ -105,7 +105,8 @@ try:
             # load the cam_shutter_again
             
             for cam in [0,1]:
-                ag,shutter = pos2shutters[(cam,h,v)]
+                ag= pos2shutters[(cam,h,v)][0][0]
+                shutter =pos2shutters[(cam,h,v)][0][1]
                 img_filename = os.path.join(output_dir, f"cam{cam}_{shutter/1e3}ms_ag{ag}_iter{ii}_h{h}v{v}.jpg")
                 subprocess.run(["bash", os.path.join(PATHS['cam'],"cam_take_photo.sh"), img_filename,
                                 str(cam), str(shutter), str(ag)], check=True)
