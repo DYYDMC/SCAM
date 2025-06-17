@@ -56,8 +56,6 @@ def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
 
     def update_range(search_range, val, direction):
         if direction == "increase":
-            print('increase the range!!!')
-            print([x for x in search_range if x > val])
             return [x for x in search_range if x > val]
         elif direction == "decrease":
             return [x for x in search_range if x < val]
@@ -82,10 +80,11 @@ def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
             new_range_shutter = update_range(search_range_shutter, current_shutter, dir_change)
             
             # priority to shutter, then again
-            for new_ag in new_range_again:
+            for new_ag in reversed(new_range_again):
                 stack.append((new_ag, current_shutter))
-            for new_shutter in new_range_shutter:
+            for new_shutter in reversed(new_range_shutter):
                 stack.append((current_ag, new_shutter))
+                
     return results
 
 def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
