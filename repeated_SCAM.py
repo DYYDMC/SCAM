@@ -19,7 +19,8 @@ PATHS = {
     'cam': os.path.join(SCAM_PATH, 'cam'),
     'data': os.path.join(SCAM_PATH, 'data')
 }
-
+sys.path.insert(1, PATHS['cam'])
+from find_ag_shutter import call_bash_script,analyze_image, adaptive_search_exposure
 sys.path.insert(1, PATHS['rs'])
 from ESP32_light_utils import initialize_connection, move_to_esp32, close_connection
 sys.path.insert(1,PATHS['scan'])
@@ -62,7 +63,16 @@ scan_data = {
     'num_scan_perPos': num_scan_perPos,
     'measurements': {},
 }
+pos2shutters={}
 print(scan_data['scan_positions'])
+for scan_pos in scan_data['scan_positions']:
+    h,v = scan_pos
+    move_to_esp32(h, v)
+    time.sleep(2)
+    for cam in [0,1]:
+        pos2shutters[(cam,h,v)] = adaptive_search_exposure(0,output_dir)
+        print(f"Camera {cam} shutter settings for position (h={h}, v={v}): {pos2shutters[(cam,h,v)]}")
+
 # --- Scan Loop ---
 try:
     previous_int_t = INT_TIME_MS * 1000  # Start with the default integration time
