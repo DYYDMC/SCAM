@@ -111,6 +111,6 @@ if __name__ == "__main__":
     shutter_range = range(int(33e3), int(1033e3), int(50e3))
     again_range = [round(ii / 10.0, 1) for ii in range(12, 81, 4)]
     initial_guesses = [
-    (0, 1.2, 633000),
-    (1, 2.0, 833000)]
+    (0, 1.2, 33000),
+    (1, 1.2, 33000)]
     main(camera_ids, shutter_range, again_range, output_dir, initial_guesses)
