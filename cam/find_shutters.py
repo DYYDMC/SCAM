@@ -99,7 +99,10 @@ def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=Non
     to_save = np.array([[cam_id, ag, sh] for cam_id, (sh, ag) in sorted(results.items())])
     local_to_save = np.copy(to_save)
     global_to_save = np.copy(local_to_save)
+    # save one in the cam_path under the timestamp folder
     np.save(os.path.join(output_dir, 'cam_shutter_ag.npy'), local_to_save)
+    
+    # save/overwrite one in the data folder for the global access i.e. exposure time adapts
     np.save(os.path.join(DATA_PATH, 'cam_shutter_ag.npy'), global_to_save)
 
     return results
@@ -110,6 +113,6 @@ if __name__ == "__main__":
     shutter_range = range(int(33e3), int(1033e3), int(50e3))
     again_range = [round(ii / 10.0, 1) for ii in range(12, 81, 4)]
     initial_guesses = [
-    (0, 1.2, 33000),
-    (1, 1.2, 33000)]
+    (0, 1.2, 283000),
+    (1, 1.2, 333000)]
     main(camera_ids, shutter_range, again_range, output_dir, initial_guesses)
