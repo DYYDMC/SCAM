@@ -5,6 +5,7 @@ import numpy as np
 import subprocess
 from datetime import datetime
 import seabreeze.spectrometers as sb
+import pickle
 
 # --- Configuration ---
 HOME = os.path.expanduser("~")
