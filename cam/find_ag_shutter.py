@@ -1,5 +1,6 @@
 import subprocess
 import os
+import sys
 import numpy as np
 import cv2
 from datetime import datetime
@@ -42,7 +43,7 @@ def analyze_image(img_filename):
     else:
         return "ok"
 # Core search function
-def adaptive_search_exposure(camera_id, output_dir, initial_tuple):
+def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
     camera_id = int(camera_id)
     output_dir = str(output_dir)
     ag, shutter = initial_tuple
@@ -113,8 +114,5 @@ if __name__ == "__main__":
     search_range_shutter = list(range(int(33e3), int(1033e3), int(50e3)))
     search_range_again = np.arange(min_again, max_again, step_again).round(1).tolist()
     initial_guesses = {0:(1.2, 283000), 1:(1.2, 333000)} # ag_shutter combo
-    
-    
-    
     main(camera_ids, search_range_again, search_range_shutter, output_dir, initial_guesses)
     
