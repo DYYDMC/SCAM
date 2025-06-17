@@ -31,10 +31,10 @@ all_int_times = np.load(os.path.join(PATHS['data'], 'all_int_times.npy'))
 SERIAL_NUMBER = 'S03615'
 INT_TIME_MS = 100  # in milliseconds init integration time
 STEP_DEG = 2
-V_RANGE = (-24, 24)
-H_RANGE = (-34, 34)
-num_scan_perPos = 1
-num_iterations = 1 # number of iterations for 3-pos-scan
+V_RANGE = (-10,10)#(-24, 24)
+H_RANGE = (-20,20)##(-34, 34)
+num_scan_perPos = 5
+num_iterations = 1 # number of iterations for multip-pos-scan
 
 # --- Initialization ---
 initialize_connection()
