@@ -52,19 +52,25 @@ def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_
                     if (camera_id, analoggain, shutter) not in initial_guesses:
                         continue
                 try:
+                    print('TRYING!!!!!!!!!!!!!!')
                     img_filename = call_bash_script(camera_id, shutter, analoggain, output_dir)
+                    print(img_filename)
                     exposure_status = analyze_image(img_filename)
+                    
                     if exposure_status == "ok":
                         results.append([camera_id, analoggain, shutter])
                         found_ok = True
                         break
-                    os.remove(img_filename)
+                    else:
+                        os.remove(img_filename)
                 except Exception as e:
                     print(f"Failed: cam{camera_id}, shutter={shutter}, again={analoggain} -> {e}")
     return results
 
 def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
     results = search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_guesses)
+    print(results,type(results))
+    print(len(results))
     toSave = np.copy(results)
     print(toSave)
     np.save(os.path.join(output_dir, 'cam_shutter_ag.npy'), toSave)
