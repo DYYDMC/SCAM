@@ -73,11 +73,12 @@ def adaptive_search_exposure(camera_id, output_dir, initial_tuple):
             dir_change = "increase" if result == "underexposed" else "decrease"
             new_range_again = update_range(search_range_again, current_ag, dir_change)
             new_range_shutter = update_range(search_range_shutter, current_shutter, dir_change)
-
-            for new_b in new_range_shutter:
-                stack.append((current_ag, new_b))
+            
+            # priority to shutter, then again
             for new_ag in new_range_again:
                 stack.append((new_ag, current_shutter))
+            for new_shutter in new_range_shutter:
+                stack.append((current_ag, new_shutter))
     return results
 
 def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
