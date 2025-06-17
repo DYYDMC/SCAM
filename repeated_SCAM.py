@@ -47,10 +47,6 @@ if not os.path.exists(dark_noise_file):
     raise FileNotFoundError(f"Dark noise file missing: {dark_noise_file}")
 dark_noise = np.load(dark_noise_file)['dark_avg']
 
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-output_dir = os.path.join(PATHS['data'], timestamp)
-os.makedirs(output_dir, exist_ok=True)
-
 scan_data = {
     'serial_number': SERIAL_NUMBER,
     'wavelengths': wavelengths,
