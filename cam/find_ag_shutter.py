@@ -44,6 +44,11 @@ def analyze_image(img_filename):
         return "ok"
 # Core search function
 def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
+    min_shutter, max_shutter, step_shutter = int(33e3), int(1033e3), int(50e3)
+    min_again, max_again, step_again = 1.2, 8.1, 0.4
+    search_range_shutter = list(range(int(33e3), int(1033e3), int(50e3)))
+    search_range_again = np.arange(min_again, max_again, step_again).round(1).tolist()
+
     camera_id = int(camera_id)
     output_dir = str(output_dir)
     ag, shutter = initial_tuple
