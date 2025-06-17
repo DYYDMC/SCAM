@@ -41,8 +41,9 @@ def analyze_image(img_filename):
     else:
         return "ok"
 def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
-    results = []
-
+    results = {}
+    cam0_found = False
+    cam1_found = False
     # try the initial guesses first
     if initial_guesses:
         for camera_id, analoggain, shutter in initial_guesses:
@@ -54,19 +55,22 @@ def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_
                 if exposure_status == "ok":
                     results.append([camera_id, analoggain, shutter])
                     print(f"Found good settings: cam{camera_id}, shutter={shutter}, again={analoggain}")
-                    return results
+                    results[int(camera_id)] =(shutter,analoggain)
+                    if int(camera_id) == 0:
+                        cam0_found = True
+                    else:
+                        cam1_found = True
+                        
                 else:
                     os.remove(img_filename)
-            except Exception as e:
-                print(f"Failed initial guess: cam{camera_id}, shutter={shutter}, again={analoggain} -> {e}")
-    if len(results)<2:
-        print("Not ALL good guesses found, continuing search...")
-    for camera_id in camera_ids:
-        found_ok = False
-        for analoggain in again_range:
-            if found_ok:
-                break
-            for shutter in shutter_range:
+    if cam0_found and cam1_found:
+        return results
+    elif cam0_found:
+        ref_shutter,ref_analoggain = results[0]
+        new_again_range = range(ref_analoggain,again_range.stop,again_range.step)
+        new_shutter_range = range(ref_shutter,shutter_range.stop,shutter_range.step)
+        for analoggain in new_again_range:
+            for shutter in new_shutter_range:
                 try:
                     print('TRYING!!!!!!!!!!!!!!')
                     img_filename = call_bash_script(camera_id, shutter, analoggain, output_dir)
@@ -74,13 +78,27 @@ def search_exposure(camera_ids, shutter_range, again_range, output_dir, initial_
                     exposure_status = analyze_image(img_filename)
                     
                     if exposure_status == "ok":
-                        results.append([camera_id, analoggain, shutter])
-                        found_ok = True
-                        break
+                        results[1] =(shutter,analoggain)
+                        cam1_found = True
+                        return results
                     else:
                         os.remove(img_filename)
-                except Exception as e:
-                    print(f"Failed: cam{camera_id}, shutter={shutter}, again={analoggain} -> {e}")
+    else:
+        for camera_id in camera_ids:
+            for analoggain in new_again_range:
+                for shutter in new_shutter_range:
+                    try:
+                        print('TRYING!!!!!!!!!!!!!!')
+                        img_filename = call_bash_script(camera_id, shutter, analoggain, output_dir)
+                        print(img_filename)
+                        exposure_status = analyze_image(img_filename)
+                        
+                        if exposure_status == "ok":
+                            results[int(camera_id)] =(shutter,analoggain)
+                            cam1_found = True
+                            return results
+                        else:
+                            os.remove(img_filename)
     return results
 
 def main(camera_ids, shutter_range, again_range, output_dir, initial_guesses=None):
@@ -101,6 +119,6 @@ if __name__ == "__main__":
     shutter_range = range(int(33e3), int(1033e3), int(50e3))
     again_range = [round(ii / 10.0, 1) for ii in range(12, 81, 4)]
     initial_guesses = [
-    (0, 1.2, 83000),
-    (1, 1.2, 133000)]
+    (0, 1.2, 633000),
+    (1, 2.0, 833000)]
     main(camera_ids, shutter_range, again_range, output_dir, initial_guesses)
