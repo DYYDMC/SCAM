@@ -5,6 +5,7 @@ import numpy as np
 import subprocess
 from datetime import datetime
 import seabreeze.spectrometers as sb
+import pickle
 
 # --- Configuration ---
 HOME = os.path.expanduser("~")
@@ -30,10 +31,10 @@ all_int_times = np.load(os.path.join(PATHS['data'], 'all_int_times.npy'))
 SERIAL_NUMBER = 'S03615'
 INT_TIME_MS = 100  # in milliseconds init integration time
 STEP_DEG = 2
-V_RANGE = (-24, 24)
-H_RANGE = (-34, 34)
-num_scan_perPos = 1
-num_iterations = 1 # number of iterations for 3-pos-scan
+V_RANGE = (-10,10)#(-24, 24)
+H_RANGE = (-20,20)##(-34, 34)
+num_scan_perPos = 5
+num_iterations = 1 # number of iterations for multip-pos-scan
 
 # --- Initialization ---
 initialize_connection()
@@ -46,10 +47,6 @@ if not os.path.exists(dark_noise_file):
     raise FileNotFoundError(f"Dark noise file missing: {dark_noise_file}")
 dark_noise = np.load(dark_noise_file)['dark_avg']
 
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-output_dir = os.path.join(PATHS['data'], timestamp)
-os.makedirs(output_dir, exist_ok=True)
-
 scan_data = {
     'serial_number': SERIAL_NUMBER,
     'wavelengths': wavelengths,
@@ -59,62 +56,86 @@ scan_data = {
     'h_max': H_RANGE[1],
     'step_size': STEP_DEG,
     'num_iterations': num_iterations,
-    'scan_positions' : [(0,v) for v in [V_RANGE[0],0,V_RANGE[1]]],
+    # 'scan_positions' : [(0,v) for v in range(V_RANGE[0],V_RANGE[1]+1,STEP_DEG)],
+    #'scan_positions' : [(h,0) for h in range(H_RANGE[0],H_RANGE[1]+1,STEP_DEG*2)],
+    # 'scan_positions':[[0,0]],
     'num_scan_perPos': num_scan_perPos,
     'measurements': {},
 }
-pos2shutters={}
-print(scan_data['scan_positions'])
-for scan_pos in scan_data['scan_positions']:
-    h,v = scan_pos
-    move_to_esp32(h, v)
-    time.sleep(2)
-    for cam in [0,1]:
-        pos2shutters[(cam,h,v)] = adaptive_search_exposure(cam,output_dir)
-        print(f"Camera {cam} shutter settings for position (h={h}, v={v}): {pos2shutters[(cam,h,v)]}")
+for hhvv in range(1,10):
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_dir = os.path.join(PATHS['data'], timestamp)
+    os.makedirs(output_dir, exist_ok=True)
+    if hhvv%2==0:
+        scan_data['scan_positions'] = [(h,0) for h in range(H_RANGE[0],H_RANGE[1]+1,STEP_DEG*2)]
+        pos2shutters_dict = os.path.join(PATHS['data'], 'pos2shutters_h.pkl')
+    else:
+        scan_data['scan_positions'] = [(0,v) for v in range(V_RANGE[0],V_RANGE[1]+1,STEP_DEG)]
+        pos2shutters_dict = os.path.join(PATHS['data'], 'pos2shutters_v.pkl')
+    if os.path.exists(pos2shutters_dict):
+        with open(pos2shutters_dict, 'rb') as f:
+            pos2shutters = pickle.load(f)
+            print(pos2shutters)
+    else:
+        pos2shutters={}
+        print(scan_data['scan_positions'])
 
-# --- Scan Loop ---
-try:
-    previous_int_t = INT_TIME_MS * 1000  # Start with the default integration time
-    for ii in range(num_iterations):  # Loop through the specified number of iterations
         for scan_pos in scan_data['scan_positions']:
-            h, v = scan_pos
+            h,v = scan_pos
             move_to_esp32(h, v)
             time.sleep(2)
-            tmp_int_t = get_optimal_integration_time(all_int_times, spec, previous_ints=previous_int_t)
-            previous_int_t = tmp_int_t  # Use the current integration time for the next iteration
-            time.sleep(0.5)
-            spec.integration_time_micros(tmp_int_t * 1000)
-            
-            for scan_num in range(num_scan_perPos):
-                # take a measurement
-                print(f"Taking measurement at position (h={h}, v={v}), scan number {scan_num + 1}/{num_scan_perPos}")
-                _, spectrum = spec.spectrum()
-                corrected = spectrum - dark_noise
-                
-                # store the measurement for the current timestamp and position
-                # easier modification for one position multiple scans : same pos different timestamps
-                ts = int(time.time())
-                scan_data['measurements'][ts] = {}
-                scan_data['measurements'][ts]['pos']=(h,v)
-                scan_data['measurements'][ts]['clean'] = corrected
-                scan_data['measurements'][ts]['int_t'] = tmp_int_t
-                time.sleep(0.5)
-
-            ## start to take camera img
-            # load the cam_shutter_again
-            
             for cam in [0,1]:
-                ag= pos2shutters[(cam,h,v)][0][0]
-                shutter =pos2shutters[(cam,h,v)][0][1]
-                img_filename = os.path.join(output_dir, f"cam{cam}_{shutter/1e3}ms_ag{ag}_iter{ii}_h{h}v{v}.jpg")
-                subprocess.run(["bash", os.path.join(PATHS['cam'],"cam_take_photo.sh"), img_filename,
-                                str(cam), str(shutter), str(ag)], check=True)
-        
+                pos2shutters[(cam,h,v)] = adaptive_search_exposure(cam,output_dir)
+                print(f"Camera {cam} shutter settings for position (h={h}, v={v}): {pos2shutters[(cam,h,v)]}")
+        with open(pos2shutters_dict, 'wb') as f:
+            pickle.dump(pos2shutters, f)
+    # --- Scan Loop ---
+    try:
+        previous_int_t = INT_TIME_MS * 1000  # Start with the default integration time
+        for ii in range(num_iterations):  # Loop through the specified number of iterations
+            for scan_pos in scan_data['scan_positions']:
+                h, v = scan_pos
+                move_to_esp32(h, v)
+                time.sleep(2)
+                tmp_int_t = get_optimal_integration_time(all_int_times, spec, previous_ints=previous_int_t)
+                previous_int_t = tmp_int_t  # Use the current integration time for the next iteration
+                time.sleep(0.5)
+                spec.integration_time_micros(tmp_int_t * 1000)
+                
+                for scan_num in range(num_scan_perPos):
+                    # take a measurement
+                    print(f"Taking measurement at position (h={h}, v={v}), scan number {scan_num + 1}/{num_scan_perPos}")
+                    _, spectrum = spec.spectrum()
+                    corrected = spectrum - dark_noise
+                    time.sleep(1)
+                    # store the measurement for the current timestamp and position
+                    # easier modification for one position multiple scans : same pos different timestamps
+                    ts = int(time.time())
+                    scan_data['measurements'][ts] = {}
+                    scan_data['measurements'][ts]['pos']=(h,v)
+                    scan_data['measurements'][ts]['clean'] = corrected
+                    scan_data['measurements'][ts]['int_t'] = tmp_int_t
+                    time.sleep(0.5)
 
-finally:
-    close_connection()
-    spec.close()
+                ## start to take camera img
+                # load the cam_shutter_again
+                
+                for cam in [0,1]:
+                    inital_guess = pos2shutters[(cam,h,v)][0]
+                    print(inital_guess)
+                    pos2shutters[(cam,h,v)] = adaptive_search_exposure(cam,output_dir,inital_guess)
+                    ag= pos2shutters[(cam,h,v)][0][0]
+                    shutter =pos2shutters[(cam,h,v)][0][1]
+                    img_filename = os.path.join(output_dir, f"cam{cam}_{shutter/1e3}ms_ag{ag}_iter{ii}_h{h}v{v}.jpg")
+                    subprocess.run(["bash", os.path.join(PATHS['cam'],"cam_take_photo.sh"), img_filename,
+                                    str(cam), str(shutter), str(ag)], check=True)
+            output_file_tmp = os.path.join(output_dir, f'scan_{ii}.npz')
+            np.savez_compressed(output_file_tmp, **scan_data)
+
+    finally:
+        print(f'took no. {hhvv+1} panorama')
+close_connection()
+spec.close()
 
 # --- Save Output ---
 output_file = os.path.join(output_dir, 'scan.npz')

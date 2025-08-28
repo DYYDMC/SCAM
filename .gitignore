@@ -1,5 +1,9 @@
+# recording
+spec_scan/2025*/
+cali/2025*/
+data/2025*/
+cam/2025*/
 # darknoise
-
 dark_noises/*.npz
 dark_noises/*.png
 
