@@ -1,6 +1,7 @@
 import serial
 import serial.tools.list_ports
 import time
+import sys
 
 # Settings
 SERIAL_BAUDRATE = 115200
@@ -10,9 +11,15 @@ ser = None
 
 def find_esp32_serial_port():
     ports = serial.tools.list_ports.comports()
+    
     for port in ports:
-        if "USB" in port.device or "ACM" in port.device:
-            return port.device
+        if sys.platform =='darwin':
+            if "usbmodem" in port.device or "usbserial" in port.device:
+                return port.device
+        else:
+            # un-mac
+            if "USB" in port.device or "ACM" in port.device:
+                return port.device
     raise RuntimeError("ESP32 serial port not found.")
 
 def initialize_connection():
