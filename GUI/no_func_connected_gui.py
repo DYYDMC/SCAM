@@ -1,16 +1,15 @@
 import numpy as np
-from PySide6.QtGui import QPixmap, QImage, QIcon
-from PySide6.QtWidgets import QGraphicsScene
-from PySide6.QtCore import Qt
-import matplotlib.pyplot as plt
-import io
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import sys
 import os
 from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtGui import QIcon
 from PySide6.QtUiTools import loadUiType
 
-# Load the .ui file directly - NO CONVERSION NEEDED!
+# Add matplotlib integration
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
+# Load the .ui file directly
 Ui_MainWindow, QtBaseClass = loadUiType('/home/ydeng/Github/SCAM/GUI/SCAM_gui.ui')
 
 # Add project root to path
@@ -24,7 +23,7 @@ from spec_scan.spectrometer_controller import SpectrometerController
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
-        self.setupUi(self)  # Pass 'self' as the argument
+        self.setupUi(self)
         
         # Set window icon programmatically
         icon_path = os.path.join(os.path.dirname(__file__), 'SCAM_icon.png')
@@ -35,6 +34,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         ## instantiate the SpectrometerController
         self.spec_controller = SpectrometerController()
+        
+        # Replace QGraphicsView with matplotlib FigureCanvas
+        self.spectrum_figure = Figure(figsize=(5, 3))
+        self.spectrum_canvas = FigureCanvas(self.spectrum_figure)
+        
+        # Replace the QGraphicsView in the layout
+        layout = self.verticalLayout_scan_oneScan
+        # Remove the QGraphicsView and add matplotlib canvas
+        for i in reversed(range(layout.count())):
+            widget = layout.itemAt(i).widget()
+            if widget == self.graphicsView_scan_oneScan:
+                layout.removeWidget(widget)
+                widget.deleteLater()
+                break
+        
+        # Add the matplotlib canvas to the layout
+        layout.addWidget(self.spectrum_canvas)
         
         self.connect_signals()
         
@@ -54,64 +70,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_start_calibration.clicked.connect(self.on_start_calibration)
         self.btn_stop_calibration.clicked.connect(self.on_stop_calibration)
     
-    def load_plot(self, scan_data_path=None):
-        """Load and display spectrometer scan plot in QGraphicsView"""
+    def load_plot(self):
+        """Simple load_plot function similar to your original"""
+        self.spectrum_figure.clear()
+        ax = self.spectrum_figure.add_subplot(111)
         try:
-            # Use default path if none provided
-            if scan_data_path is None:
-                GUI_PATH = os.path.join(project_root, "GUI")
-                scan_data_path = os.path.join(GUI_PATH, "scan_output.npz")
-            
-            # Load the data
-            data = np.load(scan_data_path)
+            GUI_PATH = os.path.join(project_root, "GUI")
+            data = np.load(os.path.join(GUI_PATH, "scan_output.npz"))
             wavelengths = data["wavelength"]
             intensity = data["dark_avg"]
-            
-            # Create matplotlib figure
-            fig, ax = plt.subplots(figsize=(5, 3), dpi=100)
-            ax.plot(wavelengths, intensity, 'b-', linewidth=1)
-            ax.set_title("Spectrometer Output")
+            ax.plot(wavelengths, intensity)
+            #ax.set_title("Spectrometer Output")
             ax.set_xlabel("Wavelength (nm)")
-            ax.set_ylabel("Intensity")
+            #ax.set_ylabel("Intensity")
             ax.grid(True, alpha=0.3)
-            
-            # Convert matplotlib figure to QPixmap
-            buf = io.BytesIO()
-            fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-            buf.seek(0)
-            
-            # Create QPixmap from the buffer
-            pixmap = QPixmap()
-            pixmap.loadFromData(buf.getvalue(), 'PNG')
-            
-            # Clear the scene and add the pixmap
-            scene = self.graphicsView_scan_oneScan.scene()
-            if scene is None:
-                scene = QGraphicsScene()
-                self.graphicsView_scan_oneScan.setScene(scene)
-            else:
-                scene.clear()
-            
-            scene.addPixmap(pixmap)
-            self.graphicsView_scan_oneScan.fitInView(scene.itemsBoundingRect(), Qt.KeepAspectRatio)
-            
-            # Clean up
-            plt.close(fig)
-            buf.close()
-            
         except Exception as e:
-            print(f"Error loading spectrum: {str(e)}")
-            # Display error message in the graphics view
-            scene = self.graphicsView_scan_oneScan.scene()
-            if scene is None:
-                scene = QGraphicsScene()
-                self.graphicsView_scan_oneScan.setScene(scene)
-            else:
-                scene.clear()
-            
-            error_text = scene.addText(f"Error loading spectrum:\n{str(e)}")
-            self.graphicsView_scan_oneScan.fitInView(error_text.sceneBoundingRect(), Qt.KeepAspectRatio)
-            
+            ax.text(0.5, 0.5, f"Error loading spectrum:\n{str(e)}", 
+                   ha='center', va='center', transform=ax.transAxes)
+        
+        self.spectrum_canvas.draw()
+        
     # OneScan functions
     def on_spec_scan(self):
         """Handle spectral scan button"""
