@@ -1,13 +1,14 @@
 import numpy as np
 import glob
-
+import matplotlib.pyplot as plt
+import io
 import time
 import subprocess
 import sys
 import os
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QMainWindow
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtWidgets import QApplication, QMainWindow,QGraphicsScene
+from PySide6.QtGui import QIcon, QPixmap, QImage
 from PySide6.QtUiTools import loadUiType
 
 # Add matplotlib integration
@@ -34,6 +35,8 @@ CALI_PATH = os.path.join(SCAM_PATH,"cali")
 SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
 GUI_PATH = os.path.join(SCAM_PATH, "GUI")
 RS_PATH = os.path.join(SCAM_PATH,'rs_motor')
+COORDINATE_inds =[0,3,6,2,5,8,4,7,1]
+COORDINATES = np.arange(0,45,5)
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -105,7 +108,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                    ha='center', va='center', transform=ax.transAxes)
         
         self.spectrum_canvas.draw()
-        
     # OneScan functions
     def on_spec_scan(self):
         """Handle spectral scan button"""
@@ -115,6 +117,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             # Perform scan
             result = self.spec_controller.scan(int_time)
+            
             print('Scan result:', result)
             
             if result['success']:
@@ -126,7 +129,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Scan error: {str(e)}")
         
-        pan = self.spinBox_pan.value()
+        pan = self.spinBox_pan.value()*-1
         tilt = self.spinBox_tilt.value()
         print(f"Scan clicked - Integration: {int_time}ms, Pan: {pan}, Tilt: {tilt}")
     
@@ -135,7 +138,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Handle move to position and then scans"""
         try:
             # First move to position
-            pan = self.spinBox_pan.value()
+            pan = self.spinBox_pan.value()*-1
             tilt = self.spinBox_tilt.value()
             print(f"Moving to - Pan: {pan}, Tilt: {tilt}")
             
@@ -219,7 +222,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
             
-        
     def on_uv_shoot(self):
         """Handle UV camera shoot"""
         shutter = self.spinBox_uv_shutter.value()
@@ -231,21 +233,140 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         uv_shutter = self.spinBox_uv_shutter.value()
         print(f"Both cameras shoot clicked - Green: {green_shutter}ms, UV: {uv_shutter}ms")
     
+    
     # Calibration functions
     def on_start_calibration(self):
-        """Start calibration"""
-        min_pan = self.spinBox_min_pan.value()
-        max_pan = self.spinBox_max_pan.value()
-        min_tilt = self.spinBox_min_tilt.value()
-        max_tilt = self.spinBox_max_tilt.value()
-        int_time = self.spinBox_int_caliScan.value()
-        interval = self.spinBox_isi_caliScan.value()
-        
-        print(f"Start calibration clicked")
-        print(f"  Pan range: {min_pan} to {max_pan}")
-        print(f"  Tilt range: {min_tilt} to {max_tilt}")
-        print(f"  Integration: {int_time}ms, Interval: {interval}ms")
-        
+        """Start calibration scan sequence"""
+        try:
+            # Initialize reconstruction array
+            self.recon = np.random.rand(len(COORDINATES), len(COORDINATES), 3)  # RGB format
+            
+            # Get calibration parameters
+            min_pan = self.spinBox_min_pan.value() * -1
+            max_pan = self.spinBox_max_pan.value() * -1
+            min_tilt = self.spinBox_min_tilt.value()
+            max_tilt = self.spinBox_max_tilt.value()
+            int_time = self.spinBox_int_caliScan.value()
+            self.isi = self.spinBox_isi_caliScan.value() / 1000.0  # Convert ms to seconds
+            
+            # Generate scan coordinates
+            self.hh_coordinates = COORDINATES + min_pan
+            self.vv_coordinates = COORDINATES + min_tilt
+            
+            # Create scan positions
+            self.scan_pos = [(hh, vv) for hh in self.hh_coordinates for vv in self.vv_coordinates]
+            self.scan_pos_inds = [(h_id, v_id) for h_id in COORDINATE_inds for v_id in COORDINATE_inds]
+            
+            print(f"Starting calibration scan with {len(self.scan_pos)} positions")
+            print(f"Pan range: {min_pan} to {max_pan}, Tilt range: {min_tilt} to {max_tilt}")
+            
+            # Execute scan sequence
+            for i, (pos, pos_ids) in enumerate(zip(self.scan_pos, self.scan_pos_inds)):
+                pan, tilt = pos
+                pan_id, tilt_id = pos_ids
+                
+                print(f"Position {i+1}/{len(self.scan_pos)}: Pan={pan}, Tilt={tilt}")
+                
+                # Move to position
+                self.motor_controller.move_to(pan, tilt)
+                time.sleep(self.isi)
+                
+                # Perform calibration scan and store result
+                rgb_value = self.on_cali_scan()
+                self.recon[tilt_id, pan_id] = rgb_value
+                
+                # Update progress (you could add a progress bar later)
+                print(f"Completed: RGB={rgb_value}")
+                
+            print("Calibration scan completed!")
+            self.display_reconstruction()
+            self.save_calibration()
+        except Exception as e:
+            print(f"Calibration error: {str(e)}")
+    
+   
+    def on_cali_scan(self):
+        """Perform a single calibration scan and return RGB classification"""
+        try:
+            int_time = self.spinBox_int_caliScan.value()
+            
+            # Perform scan
+            result = self.spec_controller.scan(int_time)
+            
+            if result['success']:
+                # Extract data
+                wavelengths = result['wavelengths']
+                intensity = result['intensity']
+                
+                # Find peak wavelength
+                max_nm = wavelengths[np.argmax(intensity)]
+                print(f'Max intensity at: {max_nm:.1f} nm')
+                
+                # Classify based on peak wavelength
+                if max_nm > 580:
+                    return np.array([1.0, 0.0, 0.0])  # Red
+                elif max_nm < 580 and max_nm > 530:
+                    return np.array([0.0, 1.0, 0.0])  # Green
+                else:
+                    return np.array([0.0, 0.0, 1.0])  # Blue
+                    
+            else:
+                print(f"Scan failed: {result['error']}")
+                return np.array([0.0, 0.0, 0.0])  # Default to black on failure
+                
+        except Exception as e:
+            print(f"Calibration scan error: {str(e)}")
+            return np.array([0.0, 0.0, 0.0])  # Default to black on error
+    
+    def display_reconstruction(self):
+        """Display reconstruction using direct QPixmap creation"""
+        try:
+            if not hasattr(self, 'recon'):
+                print("No reconstruction data available")
+                return None
+            
+            # Convert numpy array to QImage
+            height, width, channels = self.recon.shape
+            
+            # Ensure data is in correct format (0-255 uint8)
+            recon_uint8 = (self.recon * 255).astype(np.uint8)
+            
+            # Create QImage
+            bytes_per_line = 3 * width
+            q_image = QImage(recon_uint8.data, width, height, bytes_per_line, QImage.Format_RGB888)
+            
+            # Convert to QPixmap
+            pixmap = QPixmap.fromImage(q_image)
+            
+            # Scale to fit
+            pixmap = pixmap.scaled(400, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            
+            # Display in QGraphicsView
+            scene = self.graphicsView_recon_scan.scene()
+            if scene is None:
+                scene = QGraphicsScene()
+                self.graphicsView_recon_scan.setScene(scene)
+            else:
+                scene.clear()
+            
+            scene.addPixmap(pixmap)
+            self.graphicsView_recon_scan.fitInView(scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+            
+            print("Reconstruction displayed successfully")
+            return True
+            
+        except Exception as e:
+            print(f"Error displaying reconstruction: {e}")
+            return None
+    def save_calibration(self):
+        """Save calibration data to file"""
+        if hasattr(self, 'recon'):
+            np.save(os.path.join(CALI_PATH,'calibration_reconstruction.npy'), self.recon)
+            print("Calibration data saved!")
+
+        def on_stop_calibration(self):
+            """Stop calibration"""
+            print("Stop calibration clicked")
     def on_stop_calibration(self):
         """Stop calibration"""
         print("Stop calibration clicked")
