@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import sys
 import os
 from PySide6.QtWidgets import QApplication, QMainWindow
@@ -19,6 +20,7 @@ print(project_root)
 
 # load SCAN-related functions
 from spec_scan.spectrometer_controller import SpectrometerController
+from rs_motor.motor_controller import MotorController
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -32,8 +34,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             print(f"Icon not found at: {icon_path}")
         
-        ## instantiate the SpectrometerController
+        ## instantiate the SpectrometerController and MotorController
         self.spec_controller = SpectrometerController()
+        self.motor_controller = MotorController()
         
         # Replace QGraphicsView with matplotlib FigureCanvas
         self.spectrum_figure = Figure(figsize=(5, 3))
@@ -95,7 +98,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Handle spectral scan button"""
         try:
             # Get integration time from your GUI input
-            int_time = int(self.spinBox_int_oneScan.value())
+            int_time = self.spinBox_int_oneScan.value()
             
             # Perform scan
             result = self.spec_controller.scan(int_time)
@@ -116,11 +119,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
         
     def on_move_scan(self):
-        """Handle move to position"""
-        pan = self.spinBox_pan.value()
-        tilt = self.spinBox_tilt.value()
-        print(f"Move clicked - Pan: {pan}, Tilt: {tilt}")
+        """Handle move to position and then scans"""
+        try:
+            # First move to position
+            pan = self.spinBox_pan.value()
+            tilt = self.spinBox_tilt.value()
+            print(f"Moving to - Pan: {pan}, Tilt: {tilt}")
+            
+            # Use the motor controller
+            self.motor_controller.move_to(pan, tilt)
+            
+            # Wait a bit for movement to complete
+            time.sleep(0.5)
+            
+            # Then perform the scan
+            self.on_spec_scan()
+            
+        except Exception as e:
+            print(f"Move+Scan error: {str(e)}")
     
+    def closeEvent(self, event):
+        """Clean up when window is closed"""
+        self.motor_controller.close_connection()
+        event.accept()
+        
     # Camera functions
     def on_green_shoot(self):
         """Handle green camera shoot"""
