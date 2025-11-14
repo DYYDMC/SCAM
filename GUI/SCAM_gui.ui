@@ -61,7 +61,7 @@
       <rect>
        <x>16</x>
        <y>32</y>
-       <width>168</width>
+       <width>190</width>
        <height>85</height>
       </rect>
      </property>
@@ -80,7 +80,20 @@
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QSpinBox" name="spinBox_int_oneScan"/>
+       <widget class="QSpinBox" name="spinBox_int_oneScan">
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="singleStep">
+         <number>50</number>
+        </property>
+        <property name="value">
+         <number>100</number>
+        </property>
+       </widget>
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_pan">
@@ -96,7 +109,17 @@
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QSpinBox" name="spinBox_pan"/>
+       <widget class="QSpinBox" name="spinBox_pan">
+        <property name="minimum">
+         <number>-90</number>
+        </property>
+        <property name="maximum">
+         <number>90</number>
+        </property>
+        <property name="singleStep">
+         <number>2</number>
+        </property>
+       </widget>
       </item>
       <item row="2" column="0">
        <widget class="QLabel" name="label_tilt">
@@ -104,7 +127,7 @@
          <enum>Qt::LayoutDirection::LeftToRight</enum>
         </property>
         <property name="text">
-         <string>tilt</string>
+         <string>Tilt</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTop|Qt::AlignmentFlag::AlignTrailing</set>
@@ -112,7 +135,17 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="QSpinBox" name="spinBox_tilt"/>
+       <widget class="QSpinBox" name="spinBox_tilt">
+        <property name="minimum">
+         <number>-90</number>
+        </property>
+        <property name="maximum">
+         <number>90</number>
+        </property>
+        <property name="singleStep">
+         <number>2</number>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>
@@ -159,9 +192,9 @@
      <property name="geometry">
       <rect>
        <x>232</x>
-       <y>160</y>
+       <y>183</y>
        <width>81</width>
-       <height>80</height>
+       <height>66</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_cali_exe">
@@ -192,10 +225,27 @@
      </property>
      <layout class="QFormLayout" name="formLayout_scan_times">
       <item row="0" column="1">
-       <widget class="QSpinBox" name="spinBox_int_caliScan"/>
+       <widget class="QSpinBox" name="spinBox_int_caliScan">
+        <property name="minimum">
+         <number>100</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="singleStep">
+         <number>50</number>
+        </property>
+       </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QSpinBox" name="spinBox_isi_caliScan"/>
+       <widget class="QSpinBox" name="spinBox_isi_caliScan">
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>10</number>
+        </property>
+       </widget>
       </item>
       <item row="0" column="0">
        <widget class="QLabel" name="label_int_caliScan">
@@ -216,7 +266,7 @@
          <enum>Qt::LayoutDirection::LeftToRight</enum>
         </property>
         <property name="text">
-         <string>inter-scan interval (ms)</string>
+         <string>inter-scan interval (s)</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTop|Qt::AlignmentFlag::AlignTrailing</set>
@@ -236,7 +286,17 @@
      </property>
      <layout class="QGridLayout" name="gridLayout_scan_motors">
       <item row="8" column="1">
-       <widget class="QSpinBox" name="spinBox_min_tilt"/>
+       <widget class="QSpinBox" name="spinBox_min_tilt">
+        <property name="minimum">
+         <number>-90</number>
+        </property>
+        <property name="maximum">
+         <number>90</number>
+        </property>
+        <property name="singleStep">
+         <number>2</number>
+        </property>
+       </widget>
       </item>
       <item row="2" column="0">
        <widget class="QLabel" name="label_min_pan">
@@ -265,10 +325,30 @@
        </widget>
       </item>
       <item row="3" column="2">
-       <widget class="QSpinBox" name="spinBox_max_pan"/>
+       <widget class="QSpinBox" name="spinBox_max_pan">
+        <property name="minimum">
+         <number>-90</number>
+        </property>
+        <property name="maximum">
+         <number>90</number>
+        </property>
+        <property name="singleStep">
+         <number>2</number>
+        </property>
+       </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QSpinBox" name="spinBox_max_tilt"/>
+       <widget class="QSpinBox" name="spinBox_max_tilt">
+        <property name="minimum">
+         <number>-90</number>
+        </property>
+        <property name="maximum">
+         <number>90</number>
+        </property>
+        <property name="singleStep">
+         <number>2</number>
+        </property>
+       </widget>
       </item>
       <item row="2" column="2">
        <widget class="QLabel" name="label_max_pan">
@@ -284,7 +364,17 @@
        </widget>
       </item>
       <item row="3" column="0">
-       <widget class="QSpinBox" name="spinBox_min_pan"/>
+       <widget class="QSpinBox" name="spinBox_min_pan">
+        <property name="minimum">
+         <number>-90</number>
+        </property>
+        <property name="maximum">
+         <number>90</number>
+        </property>
+        <property name="singleStep">
+         <number>2</number>
+        </property>
+       </widget>
       </item>
       <item row="7" column="1">
        <widget class="QLabel" name="label_min_tilt">
@@ -319,7 +409,7 @@
       <rect>
        <x>16</x>
        <y>32</y>
-       <width>297</width>
+       <width>301</width>
        <height>68</height>
       </rect>
      </property>
@@ -345,10 +435,30 @@
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QSpinBox" name="spinBox_green_shutter"/>
+       <widget class="QSpinBox" name="spinBox_green_shutter">
+        <property name="minimum">
+         <number>999</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="singleStep">
+         <number>50</number>
+        </property>
+       </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QSpinBox" name="spinBox_uv_shutter"/>
+       <widget class="QSpinBox" name="spinBox_uv_shutter">
+        <property name="minimum">
+         <number>999</number>
+        </property>
+        <property name="maximum">
+         <number>10000</number>
+        </property>
+        <property name="singleStep">
+         <number>50</number>
+        </property>
+       </widget>
       </item>
       <item row="0" column="0">
        <widget class="QLabel" name="label_green_shutter">
@@ -402,7 +512,7 @@
         <enum>Qt::LayoutDirection::LeftToRight</enum>
        </property>
        <property name="text">
-        <string>Green Camera            </string>
+        <string>Green Camera             </string>
        </property>
        <property name="alignment">
         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTop|Qt::AlignmentFlag::AlignTrailing</set>
@@ -415,7 +525,7 @@
         <enum>Qt::LayoutDirection::LeftToRight</enum>
        </property>
        <property name="text">
-        <string>UV Camera               </string>
+        <string>UV Camera                </string>
        </property>
        <property name="alignment">
         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTop|Qt::AlignmentFlag::AlignTrailing</set>
@@ -446,7 +556,7 @@
         <enum>Qt::LayoutDirection::LeftToRight</enum>
        </property>
        <property name="text">
-        <string>Reconstructed spectral scan                                   </string>
+        <string> Reconstructed spectral scan                                </string>
        </property>
        <property name="alignment">
         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTop|Qt::AlignmentFlag::AlignTrailing</set>
@@ -474,7 +584,7 @@
         <enum>Qt::LayoutDirection::LeftToRight</enum>
        </property>
        <property name="text">
-        <string>One spectral scan                                     </string>
+        <string>One spectral scan                                         </string>
        </property>
        <property name="alignment">
         <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTop|Qt::AlignmentFlag::AlignTrailing</set>
