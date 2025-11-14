@@ -1,9 +1,13 @@
 import numpy as np
+import glob
+
 import time
+import subprocess
 import sys
 import os
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMainWindow
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtUiTools import loadUiType
 
 # Add matplotlib integration
@@ -21,6 +25,15 @@ print(project_root)
 # load SCAN-related functions
 from spec_scan.spectrometer_controller import SpectrometerController
 from rs_motor.motor_controller import MotorController
+
+# define paths
+HOME = os.path.expanduser("~")
+SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
+CALI_PATH = os.path.join(SCAM_PATH,"cali")
+SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
+GUI_PATH = os.path.join(SCAM_PATH, "GUI")
+RS_PATH = os.path.join(SCAM_PATH,'rs_motor')
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -144,10 +157,68 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         event.accept()
         
     # Camera functions
+    def load_recent_image(self, camera_id=0):
+        """loads most recent image for camera_id"""
+        search_dir = CALI_PATH if camera_id == 0 else CAM_ROI_PATH
+        pattern = f"*cam{camera_id}*.jpg"
+        
+        try:
+            files = glob.glob(os.path.join(search_dir, pattern))
+            if files:
+                latest = max(files, key=os.path.getmtime)
+                # Use your existing labels - the image will replace the text
+                widget = self.label_green_camera if camera_id == 0 else self.label_uv_camera
+                
+                pixmap = QPixmap(latest).scaled(400, 300, Qt.KeepAspectRatio)
+                widget.setPixmap(pixmap)
+                print(f"Loaded image: {latest} into {widget.objectName()}")
+                return latest
+            else:
+                # Keep the original text if no images found
+                print(f"No images found for camera {camera_id}")
+                return None
+        except Exception as e:
+            print(f"Error loading image for camera {camera_id}: {e}")
+            return None
+
     def on_green_shoot(self):
         """Handle green camera shoot"""
-        shutter = self.spinBox_green_shutter.value()
-        print(f"Green camera shoot clicked - Shutter: {shutter}ms")
+        shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
+        print(f"Green camera shoot clicked - Shutter: {shutter0}ms")
+        
+        # Show progress indication
+        # self.status_label.setText("Capturing photo...")
+        QApplication.processEvents()  # Update UI
+        # print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0])
+        print(type(shutter0))
+        try:
+            # Use timeout to prevent hanging
+            print('before subprocess call')
+            result = subprocess.run(
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0],
+                check=True,
+                timeout=30,  # 30 second timeout
+                capture_output=True,
+                text=True
+            )
+            #self.status_label.setText("Photo captured successfully")
+            # Automatically load the most recent green camera photo
+            loaded_file = self.load_recent_image(camera_id=0)
+            if loaded_file:
+                print(f"Successfully loaded: {loaded_file}")
+            else:
+                print("Photo captured but could not load image")
+                #self.status_label.setText("Photo captured but could not load image")
+        except subprocess.TimeoutExpired:
+            #self.status_label.setText("Photo capture timed out")
+            print(f"Photo capture timed out")
+        except subprocess.CalledProcessError as e:
+            #self.status_label.setText("Photo capture failed")
+            print(f"Error: {e.stderr}")
+        except Exception as e:
+            #self.status_label.setText("Unexpected error")
+            print(f"Unexpected error: {e}")
+            
         
     def on_uv_shoot(self):
         """Handle UV camera shoot"""
