@@ -117,7 +117,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             # Perform scan
             result = self.spec_controller.scan(int_time)
-            
+            ints = result["intensity"]
+            nms = result['wavelengths']
+            max_nm = nms[np.argmax(ints)]
+            print(f'max nm:{max_nm}')
             print('Scan result:', result)
             
             if result['success']:
@@ -237,35 +240,43 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # Calibration functions
     def on_start_calibration(self):
         """Start calibration scan sequence"""
+        print('hia?')
         try:
             # Initialize reconstruction array
-            self.recon = np.random.rand(len(COORDINATES), len(COORDINATES), 3)  # RGB format
+            
+            stepsize= 3
+            print('hia?2')
             
             # Get calibration parameters
-            min_pan = self.spinBox_min_pan.value() * -1
-            max_pan = self.spinBox_max_pan.value() * -1
-            min_tilt = self.spinBox_min_tilt.value()
-            max_tilt = self.spinBox_max_tilt.value()
-            int_time = self.spinBox_int_caliScan.value()
-            self.isi = self.spinBox_isi_caliScan.value() / 1000.0  # Convert ms to seconds
+            min_pan = -18#self.spinBox_min_pan.value() * -1
+            max_pan = 18#self.spinBox_max_pan.value() * -1
+            min_tilt = 0#self.spinBox_min_tilt.value()
+            max_tilt = 40#self.spinBox_max_tilt.value()
+            self.isi = self.spinBox_isi_caliScan.value()
             
             # Generate scan coordinates
-            self.hh_coordinates = COORDINATES + min_pan
-            self.vv_coordinates = COORDINATES + min_tilt
+            self.hh_coordinates = np.arange(min_pan,max_pan+stepsize,stepsize)
+            self.vv_coordinates = np.arange(min_tilt,max_tilt+stepsize,stepsize)
+            self.recon = np.zeros((len(self.hh_coordinates)*len(self.vv_coordinates),3))
+            print(self.hh_coordinates,self.vv_coordinates,self.recon.shape)
+            # #np.random.rand(len(self.vv_coordinates), len(self.hh_coordinates), 3)  # RGB format
             
             # Create scan positions
-            self.scan_pos = [(hh, vv) for hh in self.hh_coordinates for vv in self.vv_coordinates]
-            self.scan_pos_inds = [(h_id, v_id) for h_id in COORDINATE_inds for v_id in COORDINATE_inds]
+            ## from upper-left to lower-right
+            self.scan_pos = [(hh, vv) for vv in self.vv_coordinates[::-1] for hh in self.hh_coordinates[::-1]]
+            # # self.scan_pos_inds = [(h_id, v_id) for h_id in COORDINATE_inds for v_id in COORDINATE_inds]
+            #print(self.scan_pos)
             
-            print(f"Starting calibration scan with {len(self.scan_pos)} positions")
-            print(f"Pan range: {min_pan} to {max_pan}, Tilt range: {min_tilt} to {max_tilt}")
+            #print(f"Starting calibration scan with {len(self.scan_pos)} positions")
+            #print(f"Pan range: {min_pan} to {max_pan}, Tilt range: {min_tilt} to {max_tilt}")
             
-            # Execute scan sequence
-            for i, (pos, pos_ids) in enumerate(zip(self.scan_pos, self.scan_pos_inds)):
+            # # Execute scan sequence
+            # #for i, (pos, pos_ids) in enumerate(zip(self.scan_pos, self.scan_pos_inds)):
+            for i, pos in enumerate(self.scan_pos):
                 pan, tilt = pos
-                pan_id, tilt_id = pos_ids
+                # pan_id, tilt_id = pos_ids
                 
-                print(f"Position {i+1}/{len(self.scan_pos)}: Pan={pan}, Tilt={tilt}")
+                #print(f"Position {i+1}/{len(self.scan_pos)}: Pan={pan}, Tilt={tilt}")
                 
                 # Move to position
                 self.motor_controller.move_to(pan, tilt)
@@ -273,11 +284,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 
                 # Perform calibration scan and store result
                 rgb_value = self.on_cali_scan()
-                self.recon[tilt_id, pan_id] = rgb_value
+                print(f'COLOR:{rgb_value}')
+                #self.recon[tilt_id, pan_id] = rgb_value
+                self.recon[i] = rgb_value
                 
                 # Update progress (you could add a progress bar later)
                 print(f"Completed: RGB={rgb_value}")
-                
+            self.recon = self.recon.reshape((len(self.vv_coordinates),len(self.hh_coordinates),3))    
             print("Calibration scan completed!")
             self.display_reconstruction()
             self.save_calibration()
@@ -303,12 +316,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 print(f'Max intensity at: {max_nm:.1f} nm')
                 
                 # Classify based on peak wavelength
-                if max_nm > 580:
-                    return np.array([1.0, 0.0, 0.0])  # Red
-                elif max_nm < 580 and max_nm > 530:
-                    return np.array([0.0, 1.0, 0.0])  # Green
+                if max_nm > 550:
+                    return np.array([1.0, 0.0, 0.0])  # Red 576
+                elif max_nm < 550 and max_nm > 420:
+                    return np.array([0.0, 1.0, 0.0])  # Green 483
                 else:
-                    return np.array([0.0, 0.0, 1.0])  # Blue
+                    return np.array([0.0, 0.0, 1.0])  # Blue 403nm
                     
             else:
                 print(f"Scan failed: {result['error']}")
