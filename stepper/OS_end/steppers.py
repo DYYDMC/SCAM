@@ -1,6 +1,7 @@
 import serial
 import serial.tools.list_ports
 import time
+import sys
 
 class SerialBase:
     def __init__(self, usb_hint=None):
@@ -14,10 +15,22 @@ class SerialBase:
         candidates = []
 
         for port in ports:
-            if "usbserial" in port.device or "ACM" in port.device:
-                if self.usb_hint is None or self.usb_hint in (port.description or ""):
-                    candidates.append(port.device)
-
+            if sys.platform.startswith("darwin"):
+                # mac
+                if "usbserial" in port.device or "ACM" in port.device:
+                    if self.usb_hint is None or self.usb_hint in (port.description or ""):
+                        candidates.append(port.device)
+            elif sys.platform.startswith("linux"):
+                # linux
+                if "USB" in port.device or "ACM" in port.device:
+                    if self.usb_hint is None or self.usb_hint in (port.description or ""):
+                        candidates.append(port.device)
+            else:
+                # windows
+                if "COM" in port.device:
+                    if self.usb_hint is None or self.usb_hint in (port.description or ""):
+                        candidates.append(port.device)
+            
         if not candidates:
             raise RuntimeError("No matching serial port found.")
         return candidates[0]
