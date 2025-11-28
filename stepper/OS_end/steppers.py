@@ -49,13 +49,42 @@ class SerialBase:
 
 
 class StepperController(SerialBase):
-    def move_rev(self, n_rev, clockwise=False):
+    def move_to(self, target_pan=0,target_tilt=0):
         if not self.is_connected:
             if not self.initialize_connection():
                 raise RuntimeError("Cannot move: connection failed.")
+        pan,tilt = target_pan,target_tilt
+        command = f"MOVE:{pan},{tilt}\n"
+        print(f"sending {command} over...")
+        self.ser.write(command.encode())
 
-        dir_flag = 1 if clockwise else 0
-        command = f"MOVE:{int(n_rev)},{dir_flag}\n"
+        try:
+            response = self.ser.readline().decode().strip()
+            print("ESP32-stepper Serial Response:", response)
+            return response
+        except Exception as e:
+            print("Serial read error:", str(e))
+            raise
+    def read_pos(self,):
+        if not self.is_connected:
+            if not self.initialize_connection():
+                raise RuntimeError("Cannot move: connection failed.")
+        command = f"POSITION\n"
+        print(f"sending {command} over...")
+        self.ser.write(command.encode())
+
+        try:
+            response = self.ser.readline().decode().strip()
+            print("ESP32-stepper Serial Response:", response)
+            return response
+        except Exception as e:
+            print("Serial read error:", str(e))
+            raise
+    def home_motor(self,):
+        if not self.is_connected:
+            if not self.initialize_connection():
+                raise RuntimeError("Cannot move: connection failed.")
+        command = f"HOME\n"
         print(f"sending {command} over...")
         self.ser.write(command.encode())
 
