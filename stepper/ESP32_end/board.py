@@ -11,10 +11,12 @@ from micropython import const
 # SteppersS
 STEP_TILT   = 32
 DIR_TILT    = 33
+STEPS_PER_DEG_TILT = 262
 
 #PAN
 STEP_PAN   = 25
 DIR_PAN    = 26
+STEPS_PER_DEG_PAN = 80
 
 # TO-DO
 #PAN_RANGE_DEG  = [-45, 45]
