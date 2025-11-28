@@ -21,26 +21,31 @@ print("Ready for commands...")
 
 while True:
     command = sys.stdin.readline().strip()
+    command = command.upper()
     if command.startswith("MOVE:"):
         try:
             parts = command.split(":")[1].split(",")
-            target_PAN_degree = int(parts[0])*-1 # intuitive left:neg, right:positive
+            target_PAN_degree = int(parts[0])*-1
             target_TILT_degree = int(parts[1])
             
             stepperPAN.move_to_degree(target_PAN_degree, delay_us=1000)
             time.sleep(1)
             stepperTILT.move_to_degree(target_TILT_degree, delay_us=1000)
             time.sleep(1)
-            print(f'MOVED! New position Pan: {stepperPAN.get_current_position()}°,Tilt {stepperTILT.get_current_position()}°')
+            
+            # Structured response
+            print(f"SUCCESS:MOVE|PAN:{stepperPAN.get_current_position()}|TILT:{stepperTILT.get_current_position()}")
+            
         except Exception as e:
-            print("❌ Invalid command:", str(e))
+            print(f"ERROR:MOVE|{str(e)}")
     
     elif command == "POSITION":
-        print(f'The CURRENT position:Pan: {stepperPAN.get_current_position()}°,Tilt {stepperTILT.get_current_position()}°')
+        print(f"SUCCESS:POSITION|PAN:{stepperPAN.get_current_position()}|TILT:{stepperTILT.get_current_position()}")
     
-    else:
-        # any other situation, going home
+    elif command == "HOME":
         stepperPAN.home_motor(home_position=0)
         stepperTILT.home_motor(home_position=0)
-        print("RECEIVED command other than MOVE or POSITION: ", command)
-        print("BRING MOTORS HOME")
+        print("SUCCESS:HOME|Both motors returned to zero")
+    
+    else:
+        print("ERROR:UNKNOWN_COMMAND|Use: MOVE:x,y, POSITION, HOME")

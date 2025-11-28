@@ -24,8 +24,8 @@ class Servo():
         
         # Load saved position or initialize to 0
         self.pos_degree = self._load_position()
-        
-        print(f"Stepper {motor_id} at pins STEP:{step_pin}, DIR:{dir_pin}, current position: {self.pos_degree}°")
+        # only deubg msg
+        # print(f"Stepper {motor_id} at pins STEP:{step_pin}, DIR:{dir_pin}, current position: {self.pos_degree}°")
 
     def _get_storage_filename(self):
         return f"./jsn/motor_{self.motor_id}_pos.json"
@@ -38,8 +38,8 @@ class Servo():
                 data = json.load(f)
                 return data.get('position', 0)
         except:
-            # File doesn't exist or error reading
-            return 0
+            # REMOVED: print(f"Error saving position: {e}")
+            pass  # Or log to a file if needed
 
     def _save_position(self):
         """Save current position to persistent storage"""
@@ -47,9 +47,8 @@ class Servo():
             filename = self._get_storage_filename()
             with open(filename, 'w') as f:
                 json.dump({'position': self.pos_degree}, f)
-        except Exception as e:
-            print(f"Error saving position: {e}")
-
+        except: # REMOVED: print(f"Error saving position: {e}")
+            pass  # Or log to a file if needed
     def set_pos_degree(self, pos_degree):
         """Set position and save to persistent storage"""
         self.pos_degree = pos_degree
@@ -58,7 +57,7 @@ class Servo():
     def move_to_degree(self, target_degree, steps_per_rev=400, delay_us=1000):
         """Move to absolute position and update stored position"""
         if not self.if_target_valid(target_degree):
-            print(f"Target {target_degree}° out of range")
+            # print(f"Target {target_degree}° out of range")
             return False
         
         delta_degree = target_degree - self.pos_degree
@@ -77,7 +76,7 @@ class Servo():
         
         # Update and save position
         self.set_pos_degree(target_degree)
-        print(f"Moved to {target_degree}°")
+        # print(f"Moved to {target_degree}°")
         return True
 
     def if_target_valid(self, tmp_target):
@@ -89,7 +88,7 @@ class Servo():
     def home_motor(self, home_switch_pin=None, home_position=0, max_steps=1000):
         self.move_to_degree(home_position)
         self.set_pos_degree(home_position)
-        print(f"Software homing completed for {self.motor_id} - position set to {home_position}°")
+        #print(f"Software homing completed for {self.motor_id} - position set to {home_position}°")
         return True
 
 # ----------------------------------------------------------------------------
