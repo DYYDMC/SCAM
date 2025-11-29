@@ -2,11 +2,11 @@
 # Shared Camera Configuration
 
 # Default parameters
-W=2304
-H=2592
+W=2018#2304
+H=1520#2592
 LENS=0.0
-QUICK_W=576
-QUICK_H=324
+QUICK_W=1332#576
+QUICK_H=990#324
 
 # parameters for overexposure check
 # SHUTTER_STEP=1000
