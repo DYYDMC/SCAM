@@ -5,17 +5,17 @@ source "$(dirname "${BASH_SOURCE[0]}")/camera_config.sh"
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
-SHUTTER_CAM0=500000
-SHUTTER_CAM1=1000000
-AGAIN_CAM0=7.82
-AGAIN_CAM1=5.12
+SHUTTER_CAM0=100000
+SHUTTER_CAM1=800000
+AGAIN_CAM0=1.12
+AGAIN_CAM1=1.12
 
 capture_still() {
     local img_index=$1
     local camera_id=$2
     local exposure_time=$3
     local again=$4
-    local output_file="${SCRIPT_DIR}/secondTry9x6${camera_id}_${img_index}.jpg"
+    local output_file="${SCRIPT_DIR}/Sunday_fourthTrycam${camera_id}_${img_index}.jpg"
     libcamera-still \
         --width 4056 \
         --height 3040 \
@@ -41,12 +41,12 @@ capture_still() {
 echo "+++++++++++++++++official recording starts+++++++++++++++++++++++++++++"
 
 check_and_kill_libcamera
-# capture_still "cali" 0 
-for i in {1..30}; do
-    for cam in 1; do
-        capture_still "$i" "$cam" "$SHUTTER_CAM1" "$AGAIN_CAM0"
-        sleep 2
-    done
+# capture_still "cali" 0
+for i in {0..40}; do
+    capture_still "$i" 0 "$SHUTTER_CAM0" "$AGAIN_CAM0" 
+    sleep 2
+    capture_still "$i" 1 "$SHUTTER_CAM1" "$AGAIN_CAM1"
+    capture_still "$i" 0 "$SHUTTER_CAM0" "$AGAIN_CAM0"
 done
 # shutter0=$1
 # shutter1=$2
