@@ -46,6 +46,10 @@ while True:
         stepperPAN.home_motor(home_position=0)
         stepperTILT.home_motor(home_position=0)
         print("SUCCESS:HOME|Both motors returned to zero")
+    elif command == "RESET":
+        stepperPAN.reset_pos(home_position=0)
+        stepperTILT.reset_pos(home_position=0)
+        print("SUCCESS:HOME|Both motors returned to zero")
     
     else:
         print("ERROR:UNKNOWN_COMMAND|Use: MOVE:x,y, POSITION, HOME")

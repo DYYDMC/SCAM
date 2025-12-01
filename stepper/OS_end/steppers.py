@@ -25,7 +25,6 @@ class SerialBase:
     def initialize_connection(self):
         if self.is_connected:
             return True
-
         try:
             serial_port = self.find_serial_port()
             print(f"Connecting via Serial @ {serial_port}")
@@ -85,6 +84,21 @@ class StepperController(SerialBase):
             if not self.initialize_connection():
                 raise RuntimeError("Cannot move: connection failed.")
         command = f"HOME\n"
+        print(f"sending {command} over...")
+        self.ser.write(command.encode())
+
+        try:
+            response = self.ser.readline().decode().strip()
+            print("ESP32-stepper Serial Response:", response)
+            return response
+        except Exception as e:
+            print("Serial read error:", str(e))
+            raise
+    def reset_pos(self,):
+        if not self.is_connected:
+            if not self.initialize_connection():
+                raise RuntimeError("Cannot move: connection failed.")
+        command = f"RESET\n"
         print(f"sending {command} over...")
         self.ser.write(command.encode())
 

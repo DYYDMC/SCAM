@@ -20,7 +20,7 @@ class Servo():
         self.dir_pin = Pin(dir_pin, Pin.OUT)
         self.steps_per_degree = steps_per_degree
         self.motor_id = motor_id
-        self.target_pos_degrees = list(range(-30, 31)) # limited by angle of CAM's lens
+        self.target_pos_degrees = list(range(-45, 46)) # limited by angle of CAM's lens
         
         # Load saved position or initialize to 0
         self.pos_degree = self._load_position()
@@ -85,6 +85,10 @@ class Servo():
     def get_current_position(self):
         """Get current position from persistent storage"""
         return self._load_position()
+    def reset_pos (self, home_position=0):
+        """ only update the .jsn, for motor position calibration purpose"""
+        self.set_pos_degree(home_position)
+        
     def home_motor(self, home_switch_pin=None, home_position=0, max_steps=1000):
         self.move_to_degree(home_position)
         self.set_pos_degree(home_position)
