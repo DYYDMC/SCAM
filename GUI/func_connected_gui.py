@@ -25,7 +25,8 @@ print(project_root)
 
 # load SCAN-related functions
 from spec_scan.spectrometer_controller import SpectrometerController
-from rs_motor.motor_controller import MotorController
+# from rs_motor.rcmotor_controller import MotorController
+from stepper.OS_end.steppers import StepperController
 
 # define paths
 HOME = os.path.expanduser("~")
@@ -35,6 +36,8 @@ CALI_PATH = os.path.join(SCAM_PATH,"cali")
 SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
 GUI_PATH = os.path.join(SCAM_PATH, "GUI")
 RS_PATH = os.path.join(SCAM_PATH,'rs_motor')
+STP_PATH =os.path.join(SCAM_PATH,'stepper')
+
 COORDINATE_inds =[0,3,6,2,5,8,4,7,1]
 COORDINATES = np.arange(0,45,5)
 
@@ -52,7 +55,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         ## instantiate the SpectrometerController and MotorController
         self.spec_controller = SpectrometerController()
-        self.motor_controller = MotorController()
+        # self.motor_controller = MotorController()
+        self.stepper_controller = StepperController()
         
         # Replace QGraphicsView with matplotlib FigureCanvas
         self.spectrum_figure = Figure(figsize=(5, 3))
@@ -132,7 +136,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Scan error: {str(e)}")
         
-        pan = self.spinBox_pan.value()*-1
+        pan = self.spinBox_pan.value()
         tilt = self.spinBox_tilt.value()
         print(f"Scan clicked - Integration: {int_time}ms, Pan: {pan}, Tilt: {tilt}")
     
@@ -141,12 +145,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Handle move to position and then scans"""
         try:
             # First move to position
-            pan = self.spinBox_pan.value()*-1
+            pan = self.spinBox_pan.value()
             tilt = self.spinBox_tilt.value()
             print(f"Moving to - Pan: {pan}, Tilt: {tilt}")
             
             # Use the motor controller
-            self.motor_controller.move_to(pan, tilt)
+            # self.motor_controller.move_to(pan, tilt)
+            self.stepper_controller.move_to(pan, tilt)
             
             # Wait a bit for movement to complete
             time.sleep(0.5)
@@ -159,7 +164,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
     def closeEvent(self, event):
         """Clean up when window is closed"""
-        self.motor_controller.close_connection()
+        # self.motor_controller.close_connection()
+        self. stepper_controller.close_connection()
         event.accept()
         
     # Camera functions
@@ -279,7 +285,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 #print(f"Position {i+1}/{len(self.scan_pos)}: Pan={pan}, Tilt={tilt}")
                 
                 # Move to position
-                self.motor_controller.move_to(pan, tilt)
+                # self.motor_controller.move_to(pan, tilt)
+                self.stepper_controller.move_to(pan, tilt)
                 time.sleep(self.isi)
                 
                 # Perform calibration scan and store result
