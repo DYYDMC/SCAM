@@ -83,6 +83,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # OneScan section
         self.btn_spec_scan.clicked.connect(self.on_spec_scan)
         self.btn_spec_move.clicked.connect(self.on_move_scan)
+        self.btn_spec_reset.clicked.connect(self.on_reset_pos)
         
         # Camera section
         self.btn_green_shoot.clicked.connect(self.on_green_shoot)
@@ -161,6 +162,27 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
         except Exception as e:
             print(f"Move+Scan error: {str(e)}")
+    def on_reset_pos(self):
+        """Reset pan and tilt's jsn to zero position"""
+        try:
+            
+            # Use the motor controller
+            self.stepper_controller.reset_pos()
+            
+            # Wait a bit for movement to complete
+            time.sleep(0.5)
+            
+            # Then read from the ESP32's recorded position
+            self.stepper_controller.read_pos()
+            
+        except Exception as e:
+            print(f" {str(e)}")
+    
+    def closeEvent(self, event):
+        """Clean up when window is closed"""
+        # self.motor_controller.close_connection()
+        self. stepper_controller.close_connection()
+        event.accept()
     
     def closeEvent(self, event):
         """Clean up when window is closed"""
@@ -196,18 +218,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_green_shoot(self):
         """Handle green camera shoot"""
         shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
-        print(f"Green camera shoot clicked - Shutter: {shutter0}ms")
+        gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
+        print(f"Green camera shoot clicked - Shutter: {shutter0}ms, Gain: {gain0}")
         
         # Show progress indication
         # self.status_label.setText("Capturing photo...")
         QApplication.processEvents()  # Update UI
-        # print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0])
-        print(type(shutter0))
         try:
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0],
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0],
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
@@ -232,9 +253,43 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Unexpected error: {e}")
             
     def on_uv_shoot(self):
-        """Handle UV camera shoot"""
-        shutter = self.spinBox_uv_shutter.value()
-        print(f"UV camera shoot clicked - Shutter: {shutter}ms")
+        """Handle green camera shoot"""
+        shutter1 = str(self.spinBox_uv_shutter.value()*1000) or "800000"
+        gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
+        print(f"Green camera shoot clicked - Shutter: {shutter1}ms, Gain: {gain1}")
+        
+        # Show progress indication
+        # self.status_label.setText("Capturing photo...")
+        QApplication.processEvents()  # Update UI
+        # print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0])
+        print(type(shutter1))
+        try:
+            # Use timeout to prevent hanging
+            print('before subprocess call')
+            result = subprocess.run(
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '1', shutter1,gain1],
+                check=True,
+                timeout=30,  # 30 second timeout
+                capture_output=True,
+                text=True
+            )
+            #self.status_label.setText("Photo captured successfully")
+            # Automatically load the most recent green camera photo
+            loaded_file = self.load_recent_image(camera_id=1)
+            if loaded_file:
+                print(f"Successfully loaded: {loaded_file}")
+            else:
+                print("Photo captured but could not load image")
+                #self.status_label.setText("Photo captured but could not load image")
+        except subprocess.TimeoutExpired:
+            #self.status_label.setText("Photo capture timed out")
+            print(f"Photo capture timed out")
+        except subprocess.CalledProcessError as e:
+            #self.status_label.setText("Photo capture failed")
+            print(f"Error: {e.stderr}")
+        except Exception as e:
+            #self.status_label.setText("Unexpected error")
+            print(f"Unexpected error: {e}")
         
     def on_both_shoot(self):
         """Handle both cameras shoot"""
