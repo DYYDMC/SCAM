@@ -35,8 +35,11 @@ CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
 CALI_PATH = os.path.join(SCAM_PATH,"cali")
 SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
 GUI_PATH = os.path.join(SCAM_PATH, "GUI")
+GUI_CAM0 = os.path.join(GUI_PATH,'cam0')
+GUI_CAM1 = os.path.join(GUI_PATH,'cam1')
 RS_PATH = os.path.join(SCAM_PATH,'rs_motor')
 STP_PATH =os.path.join(SCAM_PATH,'stepper')
+
 
 COORDINATE_inds =[0,3,6,2,5,8,4,7,1]
 COORDINATES = np.arange(0,45,5)
@@ -193,7 +196,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # Camera functions
     def load_recent_image(self, camera_id=0):
         """loads most recent image for camera_id"""
-        search_dir = CALI_PATH if camera_id == 0 else CAM_ROI_PATH
+        # search_dir = CALI_PATH if camera_id == 0 else CAM_ROI_PATH
+        search_dir = GUI_CAM0 if camera_id == 0 else GUI_CAM1
         pattern = f"*cam{camera_id}*.jpg"
         
         try:
@@ -220,6 +224,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
         gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         print(f"Green camera shoot clicked - Shutter: {shutter0}ms, Gain: {gain0}")
+        ii = 0
+        print(f"target path{GUI_CAM0},no. {ii} img")
         
         # Show progress indication
         # self.status_label.setText("Capturing photo...")
@@ -228,7 +234,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0],
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,GUI_CAM0,str(ii)],
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
@@ -263,11 +269,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         QApplication.processEvents()  # Update UI
         # print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0])
         print(type(shutter1))
+        ii=0
         try:
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '1', shutter1,gain1],
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '1', shutter1,gain1,GUI_CAM1,str(ii)],
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
