@@ -61,7 +61,7 @@
       <rect>
        <x>16</x>
        <y>32</y>
-       <width>337</width>
+       <width>201</width>
        <height>116</height>
       </rect>
      </property>
@@ -917,7 +917,7 @@
       <string>UPDATE</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="btn_update_2">
+    <widget class="QPushButton" name="btn_load_pos">
      <property name="geometry">
       <rect>
        <x>16</x>
@@ -930,7 +930,7 @@
       <string>load</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="btn_update_3">
+    <widget class="QPushButton" name="btn_save_pos">
      <property name="geometry">
       <rect>
        <x>72</x>
