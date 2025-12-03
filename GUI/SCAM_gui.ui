@@ -963,10 +963,10 @@
    <widget class="QLabel" name="label_uv_camera">
     <property name="geometry">
      <rect>
-      <x>16</x>
-      <y>176</y>
-      <width>58</width>
-      <height>16</height>
+      <x>8</x>
+      <y>184</y>
+      <width>305</width>
+      <height>145</height>
      </rect>
     </property>
     <property name="text">
@@ -977,9 +977,9 @@
     <property name="geometry">
      <rect>
       <x>8</x>
-      <y>336</y>
-      <width>58</width>
-      <height>16</height>
+      <y>328</y>
+      <width>313</width>
+      <height>145</height>
      </rect>
     </property>
     <property name="text">
