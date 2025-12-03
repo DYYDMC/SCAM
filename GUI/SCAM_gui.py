@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import QLineEdit, QLabel, QComboBox, QPushButton
 
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+DATA_PATH = os.path.join(SCAM_PATH, "data")
 CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
 SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
 GUI_PATH = os.path.join(SCAM_PATH, "GUI")
