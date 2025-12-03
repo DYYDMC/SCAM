@@ -94,6 +94,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
         self.btn_start_scam.clicked.connect(self.on_start_scam)
+        self.btn_both_pano.clicked.connect(self.on_both_pano)
     
     def load_plot(self):
         """Simple load_plot function similar to your original"""
@@ -206,12 +207,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Error loading image for camera {camera_id}: {e}")
             return None
 
-    def on_green_shoot(self):
+    def on_green_shoot(self,img_idx=0):
         """Handle green camera shoot"""
         shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
         gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         print(f"Green camera shoot clicked - Shutter: {shutter0}ms, Gain: {gain0}")
-        ii = 0
         print(f"target path{GUI_CAM0},no. {ii} img")
         
         # Show progress indication
@@ -221,20 +221,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,GUI_CAM0,str(ii)],
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,GUI_CAM0,str(img_idx)]
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
                 text=True
             )
-            #self.status_label.setText("Photo captured successfully")
-            # Automatically load the most recent green camera photo
-            loaded_file = self.load_recent_image(camera_id=0)
-            if loaded_file:
-                print(f"Successfully loaded: {loaded_file}")
-            else:
-                print("Photo captured but could not load image")
-                #self.status_label.setText("Photo captured but could not load image")
         except subprocess.TimeoutExpired:
             #self.status_label.setText("Photo capture timed out")
             print(f"Photo capture timed out")
@@ -245,7 +237,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
             
-    def on_uv_shoot(self):
+    def on_uv_shoot(self,img_idx=0):
         """Handle green camera shoot"""
         shutter1 = str(self.spinBox_uv_shutter.value()*1000) or "800000"
         gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
@@ -261,20 +253,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '1', shutter1,gain1,GUI_CAM1,str(ii)],
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '1', shutter1,gain1,GUI_CAM1,str(img_idx)],
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
                 text=True
             )
-            #self.status_label.setText("Photo captured successfully")
-            # Automatically load the most recent green camera photo
-            loaded_file = self.load_recent_image(camera_id=1)
-            if loaded_file:
-                print(f"Successfully loaded: {loaded_file}")
-            else:
-                print("Photo captured but could not load image")
-                #self.status_label.setText("Photo captured but could not load image")
         except subprocess.TimeoutExpired:
             #self.status_label.setText("Photo capture timed out")
             print(f"Photo capture timed out")
@@ -289,7 +273,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Handle both cameras shoot"""
         self.on_green_shoot()
         self.on_uv_shoot()
-    
+    def on_both_pano(self):
+        """Handle both cameras pano shoot"""
+        self.on_green_shoot()
+        time.sleep(1)  # small delay between shots
+        self.on_uv_shoot()
     def on_update_parameters(self):
         pan_min = self.spinBox_pan_min.value()
         pan_max = self.spinBox_pan_max.value()
