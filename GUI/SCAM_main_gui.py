@@ -221,7 +221,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,GUI_CAM0,str(img_idx)]
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh', 'capture_still', '0', shutter0, gain0,GUI_CAM0,str(img_idx))],
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
