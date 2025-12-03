@@ -147,8 +147,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Handle move to position and then scans"""
         try:
             # First move to position
-            pan = self.spinBox_pan.value()
-            tilt = self.spinBox_tilt.value()
+            pan = self.spinBox_pan_oneScan.value()
+            tilt = self.spinBox_tilt_oneScan.value()
             print(f"Moving to - Pan: {pan}, Tilt: {tilt}")
             
             # Use the motor controller
