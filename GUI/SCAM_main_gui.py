@@ -212,7 +212,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
         gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         print(f"Green camera shoot clicked - Shutter: {shutter0}ms, Gain: {gain0}")
-        print(f"target path{GUI_CAM0},no. {ii} img")
+        print(f"target path{GUI_CAM0},no. {img_idx} img")
         
         # Show progress indication
         # self.status_label.setText("Capturing photo...")
@@ -248,7 +248,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         QApplication.processEvents()  # Update UI
         # print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0])
         print(type(shutter1))
-        ii=0
         try:
             # Use timeout to prevent hanging
             print('before subprocess call')
@@ -290,10 +289,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         tilt_step = self.spinBox_tilt_stepsize.value()
         self.num_tilt = int((tilt_max - tilt_min)/tilt_step) + 1
         self.label_tilt_toUpdatenumStep.setText(str(self.num_tilt))  
-        
-    def on_start_scam(self):
-        integration_time = self.spinBox_int_oneScan.value()
-        isi = self.spinBox_isi_oneScan.value()
+    def on_start_pano(self):
+        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
+            self.on_spec_scan()
+        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
+            self.on_spec_scan()
         
         pan_min = self.spinBox_pan_min.value()
         pan_max = self.spinBox_pan_max.value()
@@ -304,7 +304,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         tilt_step = self.spinBox_tilt_stepsize.value()
         if not hasattr(self, 'num_pan') or not hasattr(self, 'num_tilt'):
             self.on_update_parameters()
-        print(f"Starting SCAM with Integration Time: {integration_time}ms, ISI: {isi}s")
+        print(f"Starting SCAM with Integration Time: {self.int_t}ms, ISI: {self.isi}s")
+        
+        pan_positions = np.arange(pan_min, pan_max + pan_step, pan_step)
+        tilt_positions = np.arange(tilt_min, tilt_max + tilt_step, tilt_step)
+        cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
+        print(f"Total positions to take CAM photos: {len(cam_path)}")
+        
+            
+        return
+        
+    def on_start_scam(self):
+        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
+            self.on_spec_scan()
+        
+        pan_min = self.spinBox_pan_min.value()
+        pan_max = self.spinBox_pan_max.value()
+        pan_step = self.spinBox_pan_stepsize.value()
+        
+        tilt_min = self.spinBox_tilt_min.value()
+        tilt_max = self.spinBox_tilt_max.value()
+        tilt_step = self.spinBox_tilt_stepsize.value()
+        if not hasattr(self, 'num_pan') or not hasattr(self, 'num_tilt'):
+            self.on_update_parameters()
+        print(f"Starting SCAM with Integration Time: {self.int_t}ms, ISI: {self.isi}s")
         
         pan_positions = np.arange(pan_min, pan_max + pan_step, pan_step)
         tilt_positions = np.arange(tilt_min, tilt_max + tilt_step, tilt_step)
@@ -317,8 +340,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(1)  # wait for movement
             
             print("Taking photo scan...")
-            self.on_green_shoot()
-            self.on_uv_shoot()
+            self.on_green_shoot(img_idx=dx)
+            self.on_uv_shoot(img_idx=idx)
             
             if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
                 self.on_spec_scan()
