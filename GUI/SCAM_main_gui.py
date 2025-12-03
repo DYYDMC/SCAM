@@ -139,10 +139,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Scan error: {str(e)}")
         
-        pan = self.spinBox_pan.value()
-        tilt = self.spinBox_tilt.value()
-        print(f"Scan clicked - Integration: {self.int_t}ms, Pan: {pan}, Tilt: {tilt}")
-        
     def on_move_scan(self):
         """Handle move to position and then scans"""
         try:
