@@ -223,8 +223,8 @@
       <rect>
        <x>8</x>
        <y>24</y>
-       <width>113</width>
-       <height>297</height>
+       <width>124</width>
+       <height>331</height>
       </rect>
      </property>
      <layout class="QFormLayout" name="formLayout">
@@ -931,7 +931,7 @@
       <string>UPDATE</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="btn_both_pano">
+    <widget class="QPushButton" name="btn_green_pano">
      <property name="geometry">
       <rect>
        <x>224</x>
@@ -941,7 +941,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>Pano ONLY</string>
+      <string>Green Pano</string>
      </property>
     </widget>
    </widget>
