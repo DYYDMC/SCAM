@@ -41,7 +41,8 @@ GUI_PATH = os.path.join(SCAM_PATH, "GUI")
 GUI_CAM0 = os.path.join(GUI_PATH,'cam0')
 GUI_CAM1 = os.path.join(GUI_PATH,'cam1')
 STP_PATH =os.path.join(SCAM_PATH,'stepper')
-SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
+# SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
+SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -94,7 +95,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
         self.btn_start_scam.clicked.connect(self.on_start_scam)
-        self.btn_both_pano.clicked.connect(self.on_both_pano)
+        self.btn_green_pano.clicked.connect(self.on_green_pano)
     
     def load_plot(self):
         """Simple load_plot function similar to your original"""
@@ -129,7 +130,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             nms = result['wavelengths']
             max_nm = nms[np.argmax(ints)]
             print(f'max nm:{max_nm}')
-            print('Scan result:', result)
             
             if result['success']:
                 print('Loading plot...')
@@ -139,6 +139,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 
         except Exception as e:
             print(f"Scan error: {str(e)}")
+        return result
         
     def on_move_scan(self):
         """Handle move to position and then scans"""
@@ -207,21 +208,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Error loading image for camera {camera_id}: {e}")
             return None
 
-    def on_green_shoot(self,img_idx=0):
+    def on_green_shoot(self,output_path=GUI_CAM0,img_idx=0):
         """Handle green camera shoot"""
         shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
         gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         print(f"Green camera shoot clicked - Shutter: {shutter0}ms, Gain: {gain0}")
-        print(f"target path{GUI_CAM0},no. {img_idx} img")
-        
-        # Show progress indication
-        # self.status_label.setText("Capturing photo...")
+        print(f"target path{GUI_CAM0}, no.{img_idx} img")
         QApplication.processEvents()  # Update UI
+        
+        output_path = output_path or GUI_CAM0
+        #print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,output_path,str(img_idx)])
         try:
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh', 'capture_still', '0', shutter0, gain0,GUI_CAM0,str(img_idx))],
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,output_path,str(img_idx)],
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
@@ -237,22 +238,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
             
-    def on_uv_shoot(self,img_idx=0):
+    def on_uv_shoot(self,output_path=GUI_CAM1,img_idx=0):
         """Handle green camera shoot"""
         shutter1 = str(self.spinBox_uv_shutter.value()*1000) or "800000"
         gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
-        print(f"Green camera shoot clicked - Shutter: {shutter1}ms, Gain: {gain1}")
+        print(f"UV camera shoot clicked - Shutter: {shutter1}ms, Gain: {gain1}")
         
-        # Show progress indication
-        # self.status_label.setText("Capturing photo...")
         QApplication.processEvents()  # Update UI
+        output_path = output_path or GUI_CAM1
         # print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0])
         print(type(shutter1))
         try:
             # Use timeout to prevent hanging
             print('before subprocess call')
             result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '1', shutter1,gain1,GUI_CAM1,str(img_idx)],
+                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '1', shutter1, gain1,output_path,str(img_idx)],
                 check=True,
                 timeout=30,  # 30 second timeout
                 capture_output=True,
@@ -272,76 +272,86 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Handle both cameras shoot"""
         self.on_green_shoot()
         self.on_uv_shoot()
-    def on_both_pano(self):
-        """Handle both cameras pano shoot"""
-        self.on_green_shoot()
-        time.sleep(1)  # small delay between shots
-        self.on_uv_shoot()
     def on_update_parameters(self):
-        pan_min = self.spinBox_pan_min.value()
-        pan_max = self.spinBox_pan_max.value()
-        pan_step = self.spinBox_pan_stepsize.value()
-        self.num_pan = int((pan_max - pan_min)/pan_step) + 1
+        self.pan_min = self.spinBox_pan_min.value()
+        self.pan_max = self.spinBox_pan_max.value()
+        self.pan_step = self.spinBox_pan_stepsize.value()
+        self.num_pan = int((self.pan_max - self.pan_min)/self.pan_step) + 1
         self.label_pan_toUpdatenumStep.setText(str(self.num_pan)) 
         
-        tilt_min = self.spinBox_tilt_min.value()
-        tilt_max = self.spinBox_tilt_max.value()
-        tilt_step = self.spinBox_tilt_stepsize.value()
-        self.num_tilt = int((tilt_max - tilt_min)/tilt_step) + 1
-        self.label_tilt_toUpdatenumStep.setText(str(self.num_tilt))  
-    def on_start_pano(self):
-        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
-            self.on_spec_scan()
-        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
-            self.on_spec_scan()
+        self.tilt_min = self.spinBox_tilt_min.value()
+        self.tilt_max = self.spinBox_tilt_max.value()
+        self.tilt_step = self.spinBox_tilt_stepsize.value()
+        self.num_tilt = int((self.tilt_max - self.tilt_min)/self.tilt_step) + 1
+        self.label_tilt_toUpdatenumStep.setText(str(self.num_tilt))
+        print(f"Updated parameters - Pan steps: {self.num_pan}, Tilt steps: {self.num_tilt}")
+        print(f"will take total {self.num_pan*self.num_tilt} photos")  
         
-        pan_min = self.spinBox_pan_min.value()
-        pan_max = self.spinBox_pan_max.value()
-        pan_step = self.spinBox_pan_stepsize.value()
-        
-        tilt_min = self.spinBox_tilt_min.value()
-        tilt_max = self.spinBox_tilt_max.value()
-        tilt_step = self.spinBox_tilt_stepsize.value()
-        if not hasattr(self, 'num_pan') or not hasattr(self, 'num_tilt'):
+        self.calculate_pano_positions()
+    
+    def calculate_pano_positions(self):
+        if not hasattr(self,"pan_min") or not hasattr(self,'pan_step'):
             self.on_update_parameters()
-        print(f"Starting SCAM with Integration Time: {self.int_t}ms, ISI: {self.isi}s")
-        
-        pan_positions = np.arange(pan_min, pan_max + pan_step, pan_step)
-        tilt_positions = np.arange(tilt_min, tilt_max + tilt_step, tilt_step)
+        pan_positions = np.arange(self.pan_min, self.pan_max + self.pan_step, self.pan_step)
+        tilt_positions = np.arange(self.tilt_min, self.tilt_max + self.tilt_step, self.tilt_step)
+        print(f"num Pan positions: {len(pan_positions)}, num Tilt positions: {len(tilt_positions)}")
+        print(f"total positions: {len(pan_positions)*len(tilt_positions)}")
         cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
-        print(f"Total positions to take CAM photos: {len(cam_path)}")
+        return cam_path
+    def on_green_pano(self):
+        if not hasattr(self,"num_pan") or not hasattr(self,'num_tilt'):
+            self.on_update_parameters()
+        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
+            self.on_spec_scan()
         
+        print(f"Starting PANO...")
+        cam_path = self.calculate_pano_positions()
+        print(f"Total positions to take CAM photos: {len(cam_path)}")
+        for idx, (pan, tilt) in enumerate(cam_path):
+            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
+            self.stepper_controller.move_to(pan, tilt)
+            time.sleep(1)  # wait for movement
+            
+            print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+            self.on_green_shoot(img_idx=idx)
+            print(f"Waiting for ISI: {self.isi}s before next position...")
             
         return
         
     def on_start_scam(self):
+        start_time = time.strftime("%Y%m%d_%H%M%S")
+        scam_data_path = os.path.join(DATA_PATH, f"SCAM_{start_time}")
+        os.makedirs(scam_data_path, exist_ok=True)
+        
+        cam0_data_path = os.path.join(scam_data_path, "cam0")
+        cam1_data_path = os.path.join(scam_data_path, "cam1")
+        os.makedirs(cam0_data_path, exist_ok=True)
+        os.makedirs(cam1_data_path, exist_ok=True)
+        
+        scan_data_path = os.path.join(scam_data_path, "scan_data")
+        os.makedirs(scan_data_path, exist_ok=True)
+        
+        print(f"Data will be saved to: {scam_data_path}")
+        
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
             self.on_spec_scan()
         
-        pan_min = self.spinBox_pan_min.value()
-        pan_max = self.spinBox_pan_max.value()
-        pan_step = self.spinBox_pan_stepsize.value()
-        
-        tilt_min = self.spinBox_tilt_min.value()
-        tilt_max = self.spinBox_tilt_max.value()
-        tilt_step = self.spinBox_tilt_stepsize.value()
         if not hasattr(self, 'num_pan') or not hasattr(self, 'num_tilt'):
             self.on_update_parameters()
         print(f"Starting SCAM with Integration Time: {self.int_t}ms, ISI: {self.isi}s")
         
-        pan_positions = np.arange(pan_min, pan_max + pan_step, pan_step)
-        tilt_positions = np.arange(tilt_min, tilt_max + tilt_step, tilt_step)
-        cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
+        cam_path = self.calculate_pano_positions()
         print(f"Total positions to take CAM photos: {len(cam_path)}")
+        
         # Iterate over all pan and tilt positions
         for idx, (pan, tilt) in enumerate(cam_path):
             print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
             self.stepper_controller.move_to(pan, tilt)
             time.sleep(1)  # wait for movement
             
-            print("Taking photo scan...")
-            self.on_green_shoot(img_idx=dx)
-            self.on_uv_shoot(img_idx=idx)
+            print(f"Taking photo scan no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+            self.on_green_shoot(output_path=cam0_data_path,img_idx=idx)
+            self.on_uv_shoot(output_path=cam1_data_path,img_idx=idx)
             
             if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
                 self.on_spec_scan()
@@ -349,24 +359,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print("Performing spectral scan...")
             for spec_pos in SPEC_ROI_CAM_POS:
                 self.stepper_controller.move_to(spec_pos[0], spec_pos[1])
-                self.on_spec_scan()
+                pan, tilt = spec_pos[0], spec_pos[1]
                 time.sleep(0.5)
+                result = self.on_spec_scan()
                 
-                result = self.spec_controller.scan(integration_time)
-            if result['success']:
-                print("Scan successful, saving data...")
-                # Save data logic here
-                data_filename = os.path.join(GUI_PATH, f"scan_pan{pan}_tilt{tilt}.npz")
-                np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
-                print(f"Data saved to {data_filename}")
-            else:
-                print(f"Scan failed at Pan: {pan}, Tilt: {tilt} - {result['error']}")
+                ints = result["intensity"]
+                nms = result['wavelengths']
+                max_nm = nms[np.argmax(ints)]
+                print(f'max nm:{max_nm}')
+                if result:
+                    print("Scan successful, saving data...")
+                    # Save data logic here
+                    data_filename = os.path.join(scan_data_path, f"photo{idx}_scan_pan{pan}_tilt{tilt}.npz")
+                    np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
+                    print(f"Data saved to {data_filename}")
+                else:
+                    print(f"Scan failed at Pan: {pan}, Tilt: {tilt} - {result['error']}")
             
-            print("Taking camera photos...")
-            self.on_both_shoot()
-            
-            print(f"Waiting for ISI: {isi}s before next position...")
-            time.sleep(isi)
+                print(f"Waiting for ISI: {self.isi}s before next position...")
+                time.sleep(self.isi)
         
 if __name__ == '__main__':
     app = QApplication(sys.argv)
