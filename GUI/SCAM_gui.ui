@@ -88,7 +88,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="btn_motors_reversedUpdate">
+       <widget class="QPushButton" name="btn_measure_dark">
         <property name="text">
          <string>DARK</string>
         </property>
