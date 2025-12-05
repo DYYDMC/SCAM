@@ -18,7 +18,10 @@ class SpectrometerController:
         """Initialize and connect to spectrometer"""
         try:
             if self.spec is None:
-                self.spec = sb.Spectrometer.from_serial_number("S03615")
+                #self.spec = sb.Spectrometer.from_serial_number("S03615") # STS-UV
+                # self.spec = sb.Spectrometer.from_serial_number("USB2+F02461")
+                self.spec = sb.Spectrometer.from_serial_number("S15434") # STS-VIS
+                
                 self.is_connected = True
                 print(f'Spectrometer connected: {self.spec.serial_number}')
                 return True
