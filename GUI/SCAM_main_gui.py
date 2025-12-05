@@ -33,6 +33,8 @@ from stepper.OS_end.steppers import StepperController
 # define paths
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
+ROI_PATH = os.path.join(SCAM_PATH, "roi")
 DATA_PATH = os.path.join(SCAM_PATH, "data")
 CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
 CALI_PATH = os.path.join(SCAM_PATH,"cali")
@@ -325,9 +327,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
             self.on_spec_scan()
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        pano_data_path = os.path.join(DATA_PATH, f"PANO_{start_time}")
-        os.makedirs(pano_data_path, exist_ok=True)
-        cam0_data_path = os.path.join(pano_data_path, "cam0")
+        cam0_data_path = os.path.join(CHESS_PATH, f"{start_time}_cam0")
         os.makedirs(cam0_data_path, exist_ok=True)
         
         print(f"Starting PANO...")
