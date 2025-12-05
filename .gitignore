@@ -6,8 +6,12 @@ cam/2025*/
 # darknoise
 dark_noises/*.npz
 dark_noises/*.png
+# pic
+*.jpg
+# cali
+*.npz
+*.json
 
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
