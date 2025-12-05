@@ -42,7 +42,8 @@ GUI_CAM0 = os.path.join(GUI_PATH,'cam0')
 GUI_CAM1 = os.path.join(GUI_PATH,'cam1')
 STP_PATH =os.path.join(SCAM_PATH,'stepper')
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
-SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
+#SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
+SPEC_TILT_POS=[3,-7,-18]
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -136,10 +137,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.load_plot()
             else:
                 print(f"Scan failed: {result['error']}")
-                
+            return result
         except Exception as e:
             print(f"Scan error: {str(e)}")
-        return result
+        
         
     def on_move_scan(self):
         """Handle move to position and then scans"""
@@ -209,15 +210,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return None
 
     def on_green_shoot(self,output_path=GUI_CAM0,img_idx=0):
+        print('pressed green shoot')
+        print(output_path)
         """Handle green camera shoot"""
         shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
         gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         print(f"Green camera shoot clicked - Shutter: {shutter0}ms, Gain: {gain0}")
-        print(f"target path{GUI_CAM0}, no.{img_idx} img")
+        print(f"target path{output_path}, no.{img_idx} img")
         QApplication.processEvents()  # Update UI
         
         output_path = output_path or GUI_CAM0
-        #print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,output_path,str(img_idx)])
+        print(output_path)
+        print(["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', '0', shutter0, gain0,output_path,str(img_idx)])
         try:
             # Use timeout to prevent hanging
             print('before subprocess call')
@@ -303,6 +307,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.on_update_parameters()
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
             self.on_spec_scan()
+        start_time = time.strftime("%Y%m%d_%H%M%S")
+        pano_data_path = os.path.join(DATA_PATH, f"PANO_{start_time}")
+        os.makedirs(pano_data_path, exist_ok=True)
+        
+        cam0_data_path = os.path.join(pano_data_path, "cam0")
+        os.makedirs(cam0_data_path, exist_ok=True)
         
         print(f"Starting PANO...")
         cam_path = self.calculate_pano_positions()
@@ -313,7 +323,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(1)  # wait for movement
             
             print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_green_shoot(img_idx=idx)
+            self.on_green_shoot(pano_data_path,img_idx=idx)
             print(f"Waiting for ISI: {self.isi}s before next position...")
             
         return
@@ -357,10 +367,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.on_spec_scan()
             
             print("Performing spectral scan...")
-            for spec_pos in SPEC_ROI_CAM_POS:
-                self.stepper_controller.move_to(spec_pos[0], spec_pos[1])
-                pan, tilt = spec_pos[0], spec_pos[1]
-                time.sleep(0.5)
+            for tilt_scan in SPEC_TILT_POS:
+                self.stepper_controller.move_to(pan,tilt_scan)
+                # atm don't change the pan
+                time.sleep(2)
                 result = self.on_spec_scan()
                 
                 ints = result["intensity"]
@@ -370,7 +380,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if result:
                     print("Scan successful, saving data...")
                     # Save data logic here
-                    data_filename = os.path.join(scan_data_path, f"photo{idx}_scan_pan{pan}_tilt{tilt}.npz")
+                    data_filename = os.path.join(scan_data_path, f"photo{idx}_scan_pan{pan}_tilt{tilt_scan}.npz")
                     np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
                     print(f"Data saved to {data_filename}")
                 else:
