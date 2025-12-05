@@ -21,12 +21,16 @@ class Servo():
         self.steps_per_degree = steps_per_degree
         self.motor_id = motor_id
         self.target_pos_degrees = list(range(-45, 46)) # limited by angle of CAM's lens
+        self.reversed = -1 # by default *-1
         
         # Load saved position or initialize to 0
         self.pos_degree = self._load_position()
         # only deubg msg
         # print(f"Stepper {motor_id} at pins STEP:{step_pin}, DIR:{dir_pin}, current position: {self.pos_degree}°")
 
+    def _set_reversed(self,value=-1):
+        if value in [-1,1]:
+            self.reversed=value
     def _get_storage_filename(self):
         return f"./jsn/motor_{self.motor_id}_pos.json"
 
@@ -53,6 +57,7 @@ class Servo():
         """Set position and save to persistent storage"""
         self.pos_degree = pos_degree
         self._save_position()
+        
 
     def move_to_degree(self, target_degree, steps_per_rev=400, delay_us=1000):
         """Move to absolute position and update stored position"""
@@ -85,9 +90,11 @@ class Servo():
     def get_current_position(self):
         """Get current position from persistent storage"""
         return self._load_position()
+    
     def reset_pos (self, home_position=0):
         """ only update the .jsn, for motor position calibration purpose"""
         self.set_pos_degree(home_position)
+        return True
         
     def home_motor(self, home_switch_pin=None, home_position=0, max_steps=1000):
         self.move_to_degree(home_position)
