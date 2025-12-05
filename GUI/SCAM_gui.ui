@@ -62,7 +62,7 @@
        <x>352</x>
        <y>16</y>
        <width>73</width>
-       <height>100</height>
+       <height>134</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_oneScan_exe">
@@ -84,6 +84,13 @@
        <widget class="QPushButton" name="btn_spec_reset">
         <property name="text">
          <string>RESET</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_measure_dark">
+        <property name="text">
+         <string>DARK</string>
         </property>
        </widget>
       </item>
@@ -230,19 +237,6 @@
        </widget>
       </item>
      </layout>
-    </widget>
-    <widget class="QPushButton" name="btn_motors_reversedUpdate">
-     <property name="geometry">
-      <rect>
-       <x>296</x>
-       <y>128</y>
-       <width>65</width>
-       <height>32</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>UPDATE</string>
-     </property>
     </widget>
    </widget>
    <widget class="QGroupBox" name="groupBox_scan">

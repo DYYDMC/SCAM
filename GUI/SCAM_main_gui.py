@@ -87,6 +87,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_spec_scan.clicked.connect(self.on_spec_scan)
         self.btn_spec_move.clicked.connect(self.on_move_scan)
         self.btn_spec_reset.clicked.connect(self.on_reset_pos)
+        self.btn_measure_dark.clicked.connect(self.on_measure_dark)
         
         # Camera section
         self.btn_green_shoot.clicked.connect(self.on_green_shoot)
@@ -118,6 +119,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         self.spectrum_canvas.draw()
     # OneScan functions
+    def on_measure_dark(self):
+        self.int_t = self.spinBox_int_oneScan.value()
+        self.isi = self.spinBox_isi_oneScan.value()
+        for ii in range(10):
+            # Perform scan
+            result = self.spec_controller.scan(self.int_t)
+            ints = result["intensity"]
+            nms = result['wavelengths']
+            print("Scan successful, saving data...")
+            # Save data logic here
+            data_filename = os.path.join(DATA_PATH, f"int_t{self.int_t}_darkNoise_no{ii+1}.npz")
+            np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
+            print(f"Data saved to {data_filename}")
+            time.sleep(self.isi)
+        
     def on_spec_scan(self):
         """Handle spectral scan button"""
         try:
