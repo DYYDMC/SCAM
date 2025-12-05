@@ -43,7 +43,7 @@ GUI_CAM1 = os.path.join(GUI_PATH,'cam1')
 STP_PATH =os.path.join(SCAM_PATH,'stepper')
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
-SPEC_TILT_POS=[3,-7,-18]
+SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
