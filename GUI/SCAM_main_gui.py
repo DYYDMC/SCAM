@@ -318,6 +318,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f"total positions: {len(pan_positions)*len(tilt_positions)}")
         cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
         return cam_path
+    
     def on_green_pano(self):
         if not hasattr(self,"num_pan") or not hasattr(self,'num_tilt'):
             self.on_update_parameters()
@@ -326,7 +327,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         pano_data_path = os.path.join(DATA_PATH, f"PANO_{start_time}")
         os.makedirs(pano_data_path, exist_ok=True)
-        
         cam0_data_path = os.path.join(pano_data_path, "cam0")
         os.makedirs(cam0_data_path, exist_ok=True)
         
@@ -339,11 +339,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(1)  # wait for movement
             
             print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_green_shoot(pano_data_path,img_idx=idx)
+            self.on_green_shoot(cam0_data_path,img_idx=idx)
             print(f"Waiting for ISI: {self.isi}s before next position...")
             
-        return
-        
     def on_start_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(DATA_PATH, f"SCAM_{start_time}")
