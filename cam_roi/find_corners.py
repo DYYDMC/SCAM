@@ -112,7 +112,10 @@ class ChessboardCornerDetector:
             if img is None:
                 continue
                 
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            if 'cam0' in fname:
+                gray = img[:,:,1]   # cam0 img,Green
+            if 'cam1' in fname:
+                gray = img[:,:,0]   # cam1 img,UV
             
             if img_size is None:
                 img_size = gray.shape[::-1]
