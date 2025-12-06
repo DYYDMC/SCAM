@@ -41,6 +41,8 @@ class ChessboardCornerDetector:
         Returns:
             corners: detected corners if found, None otherwise
         """
+        fname = os.path.basename(img_path)
+        f_dir = os.path.dirname(img_path)
         img = cv2.imread(img_path)
         
         if img is None:
@@ -57,30 +59,31 @@ class ChessboardCornerDetector:
         ret, corners = cv2.findChessboardCorners(gray, self.pattern_size, None)
         
         if ret:
+            print('detected corners')
             # Refine corner positions
             corners_refined = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), self.criteria)
             
+            # Draw and display the corners
+            img_with_corners = img.copy()
+            cv2.drawChessboardCorners(img_with_corners, self.pattern_size, corners_refined, ret)
+            
+            plt.figure(figsize=(12, 8))
+            plt.subplot(1, 2, 1)
+            plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            plt.title('Original Image')
+            plt.axis('off')
+            
+            plt.subplot(1, 2, 2)
+            plt.imshow(cv2.cvtColor(img_with_corners, cv2.COLOR_BGR2RGB))
+            plt.title('Detected Corners')
+            plt.axis('off')
+            
+            plt.tight_layout()
             if show_result:
-                # Draw and display the corners
-                img_with_corners = img.copy()
-                cv2.drawChessboardCorners(img_with_corners, self.pattern_size, corners_refined, ret)
-                
-                plt.figure(figsize=(12, 8))
-                plt.subplot(1, 2, 1)
-                plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                plt.title('Original Image')
-                plt.axis('off')
-                
-                plt.subplot(1, 2, 2)
-                plt.imshow(cv2.cvtColor(img_with_corners, cv2.COLOR_BGR2RGB))
-                plt.title('Detected Corners')
-                plt.axis('off')
-                
-                plt.tight_layout()
                 plt.show()
             else:
                 # Save image with corners
-                output_path = f"corners_detected_{os.path.basename(fname)}"
+                output_path = f_dir+f"/corners_detected_{os.path.basename(fname)}"
                 cv2.imwrite(output_path, img_with_corners)
                 print(f"Saved corners visualization: {output_path}")
             return corners_refined
@@ -256,6 +259,7 @@ class ChessboardCornerDetector:
         plt.tight_layout()
         plt.show()
         return undistorted
+
 single_jpg_path = sys.argv[1]
 
 # to_find_corners = glob.glob(crop_path+'*.jpg')
