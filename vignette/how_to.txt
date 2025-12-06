@@ -1,0 +1,5 @@
+put all white field jpg files in the corresponding folder (cam0 or cam1)
+then run python3 generate_mask.py ./cam0/ (or with ./cam1)
+this will crop the file under the cam0 or cam1 (no saving file here)
+then used the cropped file to generate a .png and .npy file for the vignette mask directly under the ./cam0 or ./cam1 folder.
+
