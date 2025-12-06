@@ -328,7 +328,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.on_spec_scan()
         start_time = time.strftime("%Y%m%d_%H%M%S")
         cam0_data_path = os.path.join(CHESS_PATH, f"{start_time}_cam0")
+        cam1_data_path = os.path.join(CHESS_PATH, f"{start_time}_cam1")
         os.makedirs(cam0_data_path, exist_ok=True)
+        os.makedirs(cam1_data_path, exist_ok=True)
         
         print(f"Starting PANO...")
         cam_path = self.calculate_pano_positions()
@@ -340,6 +342,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_green_shoot(cam0_data_path,img_idx=idx)
+            # in E5 chessboard calibration
+            print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+            self.on_uv_shoot(cam1_data_path,img_idx=idx)
             print(f"Waiting for ISI: {self.isi}s before next position...")
             
     def on_start_scam(self):
