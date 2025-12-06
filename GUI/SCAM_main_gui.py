@@ -327,8 +327,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
             self.on_spec_scan()
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        cam0_data_path = os.path.join(CHESS_PATH, f"{start_time}_cam0")
-        cam1_data_path = os.path.join(CHESS_PATH, f"{start_time}_cam1")
+        cam0_data_path = os.path.join(CHESS_PATH, f"cam0_{start_time}")
+        cam1_data_path = os.path.join(CHESS_PATH, f"cam1_{start_time}")
         os.makedirs(cam0_data_path, exist_ok=True)
         os.makedirs(cam1_data_path, exist_ok=True)
         
