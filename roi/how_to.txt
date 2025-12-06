@@ -1,0 +1,10 @@
+go to the subfolder (either ./cam0/ or ./cam1/)
+create a foder ("E2_roi_date"), put the roi jpg file there
+go back to the level where the find_rois.py is
+run python3 ./camx/E2_roi_date/roi_file_name.jpg threshold_value
+this generates two .npy file, one is the roi mask the other is the threshold_value as a log
+
+rerun this until you end up with a happy roi mask (ideally width ~.5, UV smaller than G)
+then copy the roi.npy one level up (so it's directly under /cam0/
+done
+
