@@ -85,8 +85,7 @@ class ChessboardCornerDetector:
         else:
             print(f"Chessboard corners not found in {img_path}")
             return None
-    
-    # success = detector.calibrate_camera(vigged_folder,cornered_folder, "*.jpg")
+
     def calibrate_camera(self, images_folder,output_folder,file_pattern="*.jpg"):
         """
         Perform camera calibration using multiple chessboard images
@@ -155,31 +154,9 @@ class ChessboardCornerDetector:
         
         print(f"\nSuccessfully processed {successful_calibrations} images for calibration")
         
-        # Perform camera calibration
-        ret, self.camera_matrix, self.dist_coeffs, self.rvecs, self.tvecs = cv2.calibrateCamera(
-            self.obj_points, self.img_points, img_size, None, None)
-        
-        if ret:
-            print("Camera calibration successful!")
-            self._print_calibration_results()
-            return True
-        else:
-            print("Camera calibration failed!")
-            return False
-        ## perform camera calibration with K3 fix
-        # print(f"\nSuccessfully processed {successful_calibrations} images for calibration")
-        
         # # Perform camera calibration
-        # flags = cv2.CALIB_ZERO_TANGENT_DIST | cv2.CALIB_FIX_K3
-
         # ret, self.camera_matrix, self.dist_coeffs, self.rvecs, self.tvecs = cv2.calibrateCamera(
-        #     self.obj_points,
-        #     self.img_points,
-        #     img_size,
-        #     None,
-        #     None,
-        #     flags=flags
-        # )
+        #     self.obj_points, self.img_points, img_size, None, None)
         
         # if ret:
         #     print("Camera calibration successful!")
@@ -188,6 +165,28 @@ class ChessboardCornerDetector:
         # else:
         #     print("Camera calibration failed!")
         #     return False
+        ## perform camera calibration with K3 fix
+        # print(f"\nSuccessfully processed {successful_calibrations} images for calibration")
+        
+        # Perform camera calibration
+        flags = cv2.CALIB_ZERO_TANGENT_DIST | cv2.CALIB_FIX_K3
+
+        ret, self.camera_matrix, self.dist_coeffs, self.rvecs, self.tvecs = cv2.calibrateCamera(
+            self.obj_points,
+            self.img_points,
+            img_size,
+            None,
+            None,
+            flags=flags
+        )
+        
+        if ret:
+            print("Camera calibration successful!")
+            self._print_calibration_results()
+            return True
+        else:
+            print("Camera calibration failed!")
+            return False
     
     def _print_calibration_results(self):
         """Print the calibration matrices and parameters"""
@@ -256,11 +255,9 @@ class ChessboardCornerDetector:
         # Get optimal new camera matrix
         new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
             self.camera_matrix, self.dist_coeffs, (w, h), 1, (w, h))
-        print(roi)
         
         # Undistort
         undistorted = cv2.undistort(img, self.camera_matrix, self.dist_coeffs, None, new_camera_matrix)
-        
         
         # Crop the image
         x, y, w, h = roi
