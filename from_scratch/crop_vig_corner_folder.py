@@ -4,6 +4,36 @@ import os
 import sys
 import glob
 from ChessBoardCornerDetector import ChessboardCornerDetector
+def img_correct_vignette(img_path, out_path):
+    if 'cam0' in img_path:
+        print('G ch')
+        roi = np.load(os.path.join(CAM0_VIG_PATH, "threshold_vig_roi.npy"))  # [y_min, y_max, x_min, x_max]
+        vignette_mask_cropped = np.load(os.path.join(CAM0_VIG_PATH,"roi_cropped_vig_mask.npy")) 
+    if 'cam1' in img_path:
+        print('UV ch')
+        roi = np.load(os.path.join(CAM1_VIG_PATH, "threshold_vig_roi.npy"))  # [y_min, y_max, x_min, x_max]
+        vignette_mask_cropped = np.load(os.path.join(CAM1_VIG_PATH,"roi_cropped_vig_mask.npy")) 
+    
+    
+    y_min, y_max, x_min, x_max = roi.astype(int)   
+    img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)          # H x W x C
+
+    # 1. 用同一 ROI 裁剪图像
+    cropped = img[y_min:y_max+1, x_min:x_max+1]               # Hc x Wc x C
+    # 2. 检查尺寸是否匹配
+    Hc, Wc = cropped.shape[:2]
+    assert vignette_mask_cropped.shape == (Hc, Wc)
+
+    # 3. 去暗角（限制最小增益）
+    imgfloat32 = cropped.astype(np.float32)
+    safe_mask = np.clip(vignette_mask_cropped, 0.3, 1.0).astype(np.float32)  # Hc x Wc
+
+    corrected = imgfloat32 / safe_mask
+    corrected_clipped = np.clip(corrected, 0, 255).astype(np.uint8)
+
+    cv2.imwrite(out_path, corrected_clipped)
+    return True
+
 
 # function to apply ROI
 def apply_roi_to_image(img_path, roi_npy_path, output_path):
@@ -57,8 +87,8 @@ SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CAM0_ROI_NPY = os.path.join(SCAM_PATH, "roi", "cam0","cam0_roi.npy")
 CAM1_ROI_NPY = os.path.join(SCAM_PATH, "roi", "cam1","cam1_roi.npy")
 
-CAM0_VIG_MASK = os.path.join(SCAM_PATH, "vignette", "cam0","vignette_mask.npy")
-CAM1_VIG_MASK = os.path.join(SCAM_PATH, "vignette", "cam1","vignette_mask.npy")
+CAM0_VIG_PATH =os.path.join(SCAM_PATH, "vignette", "cam0")
+CAM1_VIG_PATH =os.path.join(SCAM_PATH, "vignette", "cam1")
 
 # input a single image path (cam0_xyz.jpg or cam1_xyz.jpg)
 img_folder = sys.argv[1]
@@ -75,29 +105,31 @@ for img_path in img_paths:
     fname = os.path.basename(img_path)
 
     cropped_fname = fname.replace('.jpg', '_cropped.jpg')
-    vigged_fname = fname.replace('.jpg', '_cropped_vig_corrected.jpg')
+    
+    cropped_output_path = os.path.join(cropped_folder, cropped_fname)
+    print(cropped_output_path)
     
     cropped = apply_roi_to_image(img_path,
                                  CAM0_ROI_NPY if 'cam0' in img_path else CAM1_ROI_NPY,
-                                 os.path.join(cropped_folder, cropped_fname))
+                                 cropped_output_path)
     if cropped is not None:
         print("Cropping successful.")
         
-        # continue to vignetting correction
-        vignette_mask = np.load(CAM0_VIG_MASK) if 'cam0' in img_path else np.load(CAM1_VIG_MASK)
-        imgfloat32 = cropped.astype(np.float32)
-        corrected_img = cv2.divide(imgfloat32, vignette_mask)
-        corrected_img_clipped = np.clip(corrected_img, 0, 255).astype(np.uint8)
+        # # continue to vignetting correction
+        vigged_fname = fname.replace('.jpg', '_cropped_vig_corrected2.jpg')
         vigged_output_path = os.path.join(vigged_folder, vigged_fname)
-        cv2.imwrite(vigged_output_path, corrected_img_clipped)
-        print(f"Saved vignette corrected image: {vigged_output_path}")
+        print('input for vignette ',cropped_output_path )
+        vig_corrected = img_correct_vignette(cropped_output_path,vigged_output_path)
 
-# detect corners for all vig-corrected images
+
+corner_output_folder = os.path.join(img_folder,"corner_detected")
+os.makedirs(corner_output_folder, exist_ok=True)
+
 detector = ChessboardCornerDetector(pattern_size=(8,5))
 print("\n=== FULL CAMERA CALIBRATION ===")
 if os.path.exists(vigged_folder):
     # Perform calibration
-    success = detector.calibrate_camera(vigged_folder,cornered_folder, "*.jpg")
+    success = detector.calibrate_camera(vigged_folder,corner_output_folder, "*.jpg")
     
     if success:
         # Save calibration data
