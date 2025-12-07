@@ -15,14 +15,16 @@ CAM1_VIG_PATH =os.path.join(SCAM_PATH, "vignette", "cam1")
 
 # input a single image path (cam0_xyz.jpg or cam1_xyz.jpg)
 img_folder = sys.argv[1]
-output_folder = os.path.join(img_folder,"corner_detected")
-os.makedirs(output_folder, exist_ok=True)
+vigged_folder = os.path.join(img_folder, "cropped_vig_corrected")
+cornered_folder = os.path.join(img_folder, "cropped_corners")
+os.makedirs(vigged_folder, exist_ok=True)
+os.makedirs(cornered_folder, exist_ok=True)
 
 detector = ChessboardCornerDetector(pattern_size=(8,5))
 print("\n=== FULL CAMERA CALIBRATION ===")
 if os.path.exists(img_folder):
     # Perform calibration
-    success = detector.calibrate_camera(img_folder,output_folder, "*.jpg")
+    success = detector.calibrate_camera(vigged_folder,cornered_folder, "*.jpg")
     
     if success:
         # Save calibration data
