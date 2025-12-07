@@ -1,85 +1,42 @@
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
-from PIL import Image
 import os
-Class VignetteCorrector:
-    """
-    Class to handle vignette correction for images.
-    """
-    def __init__(self):
-        pass
-    def generate_vignette_mask(self,image_paths, num_samples=4):
-        # generate vignette template from images of uniformly illuminated white wall
-        num_samples = 4
-        vignette_mask = None
-        for i in range(num_samples):
-            img = cv2.imread(f"./cam1_cropped_Sunday_whitecam1_{i}.jpg")
-            if vignette_mask is None:
-                vignette_mask = img.astype(np.float32)
-            else:
-                vignette_mask += img.astype(np.float32)
-        vignette_mask /= num_samples
-        vignette_mask = vignette_mask / np.max(vignette_mask)
-        
-    def correct_vignette(img, vignette_mask):
-        """
-        img:path to target image
-        vignette_mask: numpy array of vignette mask
-        Correct the vignette effect in the image using the provided vignette mask.
-        """
-        imgfloat32 = cv2.imread(img).astype(np.float32)
-        
-        # Debug: Print shapes
-        print(f"Image shape: {imgfloat32.shape}")
-        print(f"Mask shape: {vignette_mask.shape}")
-        
-        # Check if shapes match
-        if imgfloat32.shape != vignette_mask.shape:
-            print("Shapes don't match! Resizing mask to match image...")
-            vignette_mask = cv2.resize(vignette_mask, (imgfloat32.shape[1], imgfloat32.shape[0]))
-        
-        corrected_img = cv2.divide(imgfloat32, vignette_mask)
-        corrected_img_clipped = np.clip(corrected_img, 0, 255).astype(np.uint8)
-        
-        return corrected_img_clipped
-    def load_vignette_mask(mask_path):
-        """
-        Load vignette mask from a .npy file.
-        
-        Args:
-            mask_path (str): Path to the .npy file containing the vignette mask.
-        """
-        vignette_mask = np.load(mask_path)
-        return vignette_mask
-    def correct_vignette(self,img,vignette_mask):
-        """
-        img:path to target image
-        vignette_mask: numpy array of vignette mask
-        Correct the vignette effect in the image using the provided vignette mask.
-        """
-        imgfloat32 = cv2.imread(img).astype(np.float32)
-        corrected_img = cv2.divide(imgfloat32, vignette_mask)
-        corrected_img_clipped = np.clip(corrected_img, 0, 255).astype(np.uint8)
-        
-        return corrected_img_clipped
-# Example usage:
-# first crop
+import sys
 
-# the ngenerate vignette mask
+HOME = os.path.expanduser("~")
+SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+CAM0_VIG_PATH =os.path.join(SCAM_PATH, "vignette", "cam0")
+CAM1_VIG_PATH =os.path.join(SCAM_PATH, "vignette", "cam1")
 
-# generate vignette template from images of uniformly illuminated white wall
-num_samples = 4
-vignette_mask = None
-for i in range(num_samples):
-    img = cv2.imread(f"./cam1_cropped_Sunday_whitecam1_{i}.jpg")
-    if vignette_mask is None:
-        vignette_mask = img.astype(np.float32)
-    else:
-        vignette_mask += img.astype(np.float32)
-vignette_mask /= num_samples
 
-# 归一化模板（防止除以0）
-vignette_mask = vignette_mask / np.max(vignette_mask)
-cv2.imwrite("./cam1_vignette_mask.png", vignette_mask * 255)
-np.save("./cam1_vignette_mask.npy", vignette_mask)
+def correct_vignette(img_path, out_path):
+    if 'cam0' in img_path:
+        roi = np.load(os.path.join(CAM0_VIG_PATH, "threshold_vig_roi.npy"))  # [y_min, y_max, x_min, x_max]
+        vignette_mask_cropped = np.load(os.path.join(CAM0_VIG_PATH,"roi_cropped_vig_mask.npy")) 
+    if 'cam1' in img_path:
+        roi = np.load(os.path.join(CAM1_VIG_PATH, "threshold_vig_roi.npy"))  # [y_min, y_max, x_min, x_max]
+        vignette_mask_cropped = np.load(os.path.join(CAM1_VIG_PATH,"roi_cropped_vig_mask.npy")) 
+    
+    print(roi,vignette_mask_cropped.shape)
+    y_min, y_max, x_min, x_max = roi.astype(int)   
+    img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)          # H x W x C
+
+    # 1. 用同一 ROI 裁剪图像
+    cropped = img[y_min:y_max+1, x_min:x_max+1]               # Hc x Wc x C
+
+    # 2. 检查尺寸是否匹配
+    Hc, Wc = cropped.shape[:2]
+    assert vignette_mask_cropped.shape == (Hc, Wc)
+
+    # 3. 去暗角（限制最小增益）
+    imgfloat32 = cropped.astype(np.float32)
+    safe_mask = np.clip(vignette_mask_cropped, 0.3, 1.0).astype(np.float32)  # Hc x Wc
+
+    corrected = imgfloat32 / safe_mask
+    corrected_clipped = np.clip(corrected, 0, 255).astype(np.uint8)
+
+    cv2.imwrite(out_path, corrected_clipped)
+    
+img_path = sys.argv[1]
+output_path = img_path.replace('.jpg', '_vig_corrected.jpg')
+correct_vignette(img_path,output_path)
