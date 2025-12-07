@@ -20,7 +20,7 @@ os.makedirs(output_folder, exist_ok=True)
 
 detector = ChessboardCornerDetector(pattern_size=(8,5))
 print("\n=== FULL CAMERA CALIBRATION ===")
-if os.path.exists(vigged_folder):
+if os.path.exists(img_folder):
     # Perform calibration
     success = detector.calibrate_camera(img_folder,output_folder, "*.jpg")
     
