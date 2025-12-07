@@ -246,6 +246,7 @@ class ChessboardCornerDetector:
             return None
         
         img = cv2.imread(img_path)
+        print(img.shape)
         if img is None:
             print(f"Error: Could not load image {img_path}")
             return None
@@ -255,9 +256,11 @@ class ChessboardCornerDetector:
         # Get optimal new camera matrix
         new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
             self.camera_matrix, self.dist_coeffs, (w, h), 1, (w, h))
+        print(roi)
         
         # Undistort
         undistorted = cv2.undistort(img, self.camera_matrix, self.dist_coeffs, None, new_camera_matrix)
+        
         
         # Crop the image
         x, y, w, h = roi
