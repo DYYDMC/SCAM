@@ -160,7 +160,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f'max nm:{max_nm}')
             
             if result['success']:
-                print('Loading plot...')
+                #print('Loading plot...')
                 self.load_plot()
             else:
                 print(f"Scan failed: {result['error']}")
@@ -194,6 +194,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             # Use the motor controller
             self.stepper_controller.reset_pos()
+            # self.stepper_controller.read_pos()
             
             # Wait a bit for movement to complete
             time.sleep(0.5)
@@ -429,6 +430,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for idx, (pan, tilt) in enumerate(cam_path):
             print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
             self.stepper_controller.move_to(pan, tilt)
+            ## wait until the target position is reached
+            
             time.sleep(1)  # wait for movement
             
             print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
@@ -455,7 +458,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
             self.on_spec_scan()
-        
         if not hasattr(self, 'num_pan') or not hasattr(self, 'num_tilt'):
             self.on_update_parameters()
         print(f"Starting SCAM with Integration Time: {self.int_t}ms, ISI: {self.isi}s")
@@ -467,32 +469,31 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for idx, (pan, tilt) in enumerate(cam_path):
             print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
             self.stepper_controller.move_to(pan, tilt)
-            time.sleep(1)  # wait for movement
+            ## wait until the target position is reached
+            time.sleep(5)  # wait for movement
+            self.stepper_controller.read_pos()
+            print('waited 5 seconds after sending MOVE cmds')
             
             print(f"Taking photo scan no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_green_shoot(output_path=cam0_data_path,img_idx=idx)
             self.on_uv_shoot(output_path=cam1_data_path,img_idx=idx)
-            
-            if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
-                self.on_spec_scan()
-            
+            print('finished uv photo')
             print("Performing spectral scan...")
             for tilt_scan in SPEC_TILT_POS:
                 self.stepper_controller.move_to(pan,tilt_scan)
                 # atm don't change the pan
                 time.sleep(2)
                 result = self.on_spec_scan()
-                
                 ints = result["intensity"]
                 nms = result['wavelengths']
                 max_nm = nms[np.argmax(ints)]
-                print(f'max nm:{max_nm}')
+                # print(f'max nm:{max_nm}')
                 if result:
-                    print("Scan successful, saving data...")
+                    #print("Scan successful, saving data...")
                     # Save data logic here
                     data_filename = os.path.join(scan_data_path, f"photo{idx}_scan_pan{pan}_tilt{tilt_scan}.npz")
                     np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
-                    print(f"Data saved to {data_filename}")
+                    #print(f"Data saved to {data_filename}")
                 else:
                     print(f"Scan failed at Pan: {pan}, Tilt: {tilt} - {result['error']}")
             
