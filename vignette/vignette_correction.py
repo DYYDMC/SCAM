@@ -9,7 +9,7 @@ CAM0_VIG_PATH =os.path.join(SCAM_PATH, "vignette", "cam0")
 CAM1_VIG_PATH =os.path.join(SCAM_PATH, "vignette", "cam1")
 
 
-def correct_vignette(img_path, out_path):
+def img_correct_vignette(img_path, out_path):
     if 'cam0' in img_path:
         roi = np.load(os.path.join(CAM0_VIG_PATH, "threshold_vig_roi.npy"))  # [y_min, y_max, x_min, x_max]
         vignette_mask_cropped = np.load(os.path.join(CAM0_VIG_PATH,"roi_cropped_vig_mask.npy")) 
@@ -37,6 +37,7 @@ def correct_vignette(img_path, out_path):
 
     cv2.imwrite(out_path, corrected_clipped)
     
-img_path = sys.argv[1]
-output_path = img_path.replace('.jpg', '_vig_corrected.jpg')
-correct_vignette(img_path,output_path)
+## test code
+# img_path = sys.argv[1]
+# output_path = img_path.replace('.jpg', '_vig_corrected.jpg')
+# img_correct_vignette(img_path,output_path)
