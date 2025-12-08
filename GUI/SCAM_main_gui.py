@@ -90,7 +90,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         layout.addWidget(self.spectrum_canvas)
         
         self.connect_signals()
-        
+    def save_config(self, config_path):
+        """Save current configuration to a JSON file"""
+        config = {
+            "pan_min": self.spinBox_pan_min.value(),
+            "pan_max": self.spinBox_pan_max.value(),
+            "pan_step": self.spinBox_pan_stepsize.value(),
+            "tilt_min": self.spinBox_tilt_min.value(),
+            "tilt_max": self.spinBox_tilt_max.value(),
+            "tilt_step": self.spinBox_tilt_stepsize.value(),
+            "int_t": self.spinBox_int_oneScan.value(),
+            "isi": self.spinBox_isi_oneScan.value(),
+            "green_shutter": self.spinBox_green_shutter.value(),
+            "green_gain": self.doubleSpinBox_green_gain.value(),
+            "uv_shutter": self.spinBox_uv_shutter.value(),
+            "uv_gain": self.doubleSpinBox_uv_gain.value()
+        }
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=4)
+        print(f"Configuration saved to {config_path}")
     def connect_signals(self):
         """Connect all UI buttons to their functions"""
         
@@ -499,6 +517,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
                 print(f"Waiting for ISI: {self.isi}s before next position...")
                 time.sleep(self.isi)
+        print("SCAM session completed.")
+        self.save_config(os.path.join(scam_data_path, "scam_config.json"))
         
 if __name__ == '__main__':
     app = QApplication(sys.argv)
