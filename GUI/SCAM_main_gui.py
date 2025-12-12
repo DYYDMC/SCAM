@@ -125,8 +125,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
+        self.btn_start_scan.clicked.connect(self.con_start_scan)
         self.btn_start_scam.clicked.connect(self.on_start_scam)
-        self.btn_green_pano.clicked.connect(self.on_green_pano)
+        self.btn_start_cam.clicked.connect(self.on_start_cam)
     
     def load_plot(self):
         """Simple load_plot function similar to your original"""
@@ -185,7 +186,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return result
         except Exception as e:
             print(f"Scan error: {str(e)}")
-        
         
     def on_move_scan(self):
         """Handle move to position and then scans"""
@@ -278,8 +278,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
-        
-    
         
     # function to apply ROI
     def apply_roi_to_image(self,gray, roi_npy_path, output_path=None):
@@ -431,7 +429,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
         return cam_path
     
-    def on_green_pano(self):
+    # def on_start_scan(self):
+        
+    def on_start_cam(self):
         if not hasattr(self,"num_pan") or not hasattr(self,'num_tilt'):
             self.on_update_parameters()
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
