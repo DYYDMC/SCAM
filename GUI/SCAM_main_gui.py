@@ -502,9 +502,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 # atm don't change the pan
                 time.sleep(2)
                 result = self.on_spec_scan()
-                ints = result["intensity"]
-                nms = result['wavelengths']
-                max_nm = nms[np.argmax(ints)]
                 # print(f'max nm:{max_nm}')
                 if result:
                     #print("Scan successful, saving data...")
