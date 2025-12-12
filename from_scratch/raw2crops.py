@@ -76,3 +76,5 @@ for img_path in img_paths:
     cropped = apply_roi_to_image(img_path,
                                  CAM0_ROI_NPY if 'cam0' in img_path else CAM1_ROI_NPY,
                                  cropped_output_path)
+    print(cropped.shape)
+    break
