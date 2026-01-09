@@ -1,0 +1,15 @@
+width=4056
+height=3040
+mode=4056:3040:12:U
+framerate=1
+roi=0,0,1,1
+awb=custom
+awbgains=1,1
+denoise=off
+hdr=off
+brightness=0
+contrast=1
+saturation=1
+sharpness=1
+autofocus-mode=manual
+camera=0
