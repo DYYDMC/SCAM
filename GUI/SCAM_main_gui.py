@@ -40,6 +40,7 @@ DATA_PATH = os.path.join(SCAM_PATH, "data")
 EXP_SEARCH_PATH = os.path.join(SCAM_PATH, "exp_search")
 CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
 CALI_PATH = os.path.join(SCAM_PATH,"cali")
+SCAN_CALI_PATH = os.path.join(SCAM_PATH, "scan_cali")
 SPEC_SCAN_PATH = os.path.join(SCAM_PATH, "spec_scan")
 GUI_PATH = os.path.join(SCAM_PATH, "GUI")
 GUI_CAM0 = os.path.join(GUI_PATH,'cam0')
@@ -125,7 +126,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
-        self.btn_start_scan.clicked.connect(self.con_start_scan)
+        self.btn_start_scan.clicked.connect(self.on_start_scan)
         self.btn_start_scam.clicked.connect(self.on_start_scam)
         self.btn_start_cam.clicked.connect(self.on_start_cam)
     
@@ -254,6 +255,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Error loading image for camera {camera_id}: {e}")
             return None
+    def call_libcamera_raw(self,camera_id,shutter,gain,output_dir,img_idx):
+        try:
+            # Use timeout to prevent hanging
+            print('before subprocess call')
+
+            result = subprocess.run(
+                ["/bin/bash", os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'), 'capture_raw', 
+                 str(camera_id), gain, shutter,output_dir,str(img_idx)],
+                check=True,
+                timeout=30,  # 30 second timeout
+                capture_output=True,
+                text=True
+            )
+            print('result:', result.stdout)
+            print(output_dir,camera_id,shutter,gain,img_idx)
+            fname = f"{output_dir}/cam{camera_id}_gain{gain}_{shutter}ms_{img_idx}.raw"
+            print("inside call_libcamera_raw():", fname)
+            return fname
+        except subprocess.TimeoutExpired:
+            #self.status_label.setText("Photo capture timed out")
+            print(f"Photo capture timed out")
+        except subprocess.CalledProcessError as e:
+            #self.status_label.setText("Photo capture failed")
+            print(f"Error: {e.stderr}")
+        except Exception as e:
+            #self.status_label.setText("Unexpected error")
+            print(f"Unexpected error: {e}")
     def call_capture_still(self,camera_id,shutter,gain,output_dir,img_idx):
         try:
             # Use timeout to prevent hanging
@@ -302,34 +330,87 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return cropped
 
     def analyze_image(self,img_filename):
-        # Open the image
-        print(img_filename)
-        img = cv2.imread(img_filename)  # Read the image using OpenCV
-        
-        if 'cam0' in img_filename:
-            gray = img[:,:,1] # G 
-        if 'cam1' in img_filename: 
-            gray = img[:,:,1] # Blue
-        print(gray.shape)
-        # crop it according to the CAM_roi
-        cropped = self.apply_roi_to_image(gray,
-                                    CAM0_ROI_NPY if 'cam0' in img_filename else CAM1_ROI_NPY,
-                                    output_path=None)
-        Wc,Hc = cropped.shape
+        if ".jpg" in img_filename:
+            # Open the image
+            print(img_filename)
+            img = cv2.imread(img_filename)  # Read the image using OpenCV
+            
+            if 'cam0' in img_filename:
+                gray = img[:,:,1] # G 
+            if 'cam1' in img_filename: 
+                gray = img[:,:,1] # Blue
+            print(gray.shape)
+            # crop it according to the CAM_roi
+            cropped = self.apply_roi_to_image(gray,
+                                        CAM0_ROI_NPY if 'cam0' in img_filename else CAM1_ROI_NPY,
+                                        output_path=None)
+            Wc,Hc = cropped.shape
 
-        underexposed_threshold = 50  # Example threshold for underexposure
-        numOverexpPxl = (cropped==255).sum()
-        numUnderexpPxl = (cropped<underexposed_threshold).sum()
-        overExpPercent = 0.01
-        underExpPercent = 0.7
-        if numOverexpPxl>int(Wc*Hc*overExpPercent):
-            print(f'{numOverexpPxl}/({Wc}*{Hc}), {numOverexpPxl/Hc/Wc*100:.2f}% pixels are 255')
-            return "overexposed"
-        elif numUnderexpPxl>int(Wc*Hc*underExpPercent):
-            print(f'{numUnderexpPxl}/({Wc}*{Hc}), {numUnderexpPxl/Hc/Wc*100:.2f}% pixels are below {underexposed_threshold}')
-            return "underexposed"
-        else:
-            return "ok"
+            underexposed_threshold = 50  # Example threshold for underexposure
+            numOverexpPxl = (cropped==255).sum()
+            numUnderexpPxl = (cropped<underexposed_threshold).sum()
+            overExpPercent = 0.01
+            underExpPercent = 0.7
+            if numOverexpPxl>int(Wc*Hc*overExpPercent):
+                print(f'{numOverexpPxl}/({Wc}*{Hc}), {numOverexpPxl/Hc/Wc*100:.2f}% pixels are 255')
+                return "overexposed"
+            elif numUnderexpPxl>int(Wc*Hc*underExpPercent):
+                print(f'{numUnderexpPxl}/({Wc}*{Hc}), {numUnderexpPxl/Hc/Wc*100:.2f}% pixels are below {underexposed_threshold}')
+                return "underexposed"
+            else:
+                return "ok"
+        if ".raw" in img_filename:
+            stride = 8128
+            width, height = 4056, 3040
+            # self.raw_stride = 8128
+            row_bytes = stride
+            frame_bytes = row_bytes * 3040
+            with open(img_filename, 'rb') as f:
+                f.seek(0 * frame_bytes)
+                raw_frame = f.read(frame_bytes)
+            raw_data = np.frombuffer(raw_frame, dtype=np.uint16)
+            full_width = stride // 2  # since each pixel is 2 bytes
+            raw_2d = raw_data.reshape((height, full_width))
+            image = raw_2d[:, :width]  # Crop to actual width
+            print(image.shape)
+            print(f'for imag:{img_filename})')
+            print(f'mean_pixel_value:{image.mean()}')
+            print(f'image shape:{image.shape}')
+            plt.imshow(image,cmap='gray')
+            plt.savefig(img_filename.replace('.raw','.png'))
+            
+            np.save(img_filename.replace('.raw','.npy'),image)
+            
+            # # Read raw image
+            # with open(img_filename, 'rb') as f:
+            #     raw_data = f.read()
+            # # Assuming a fixed resolution for simplicity; adjust as needed
+            # width, height = 4056, 3040  # Example resolution
+            # img = np.frombuffer(raw_data, dtype=np.uint8).reshape((height, width))
+            # if 'cam0' in img_filename:
+            #     gray = img  # Assuming cam0 is grayscale
+            # if 'cam1' in img_filename:
+            #     gray = img  # Assuming cam1 is grayscale
+            # print(gray.shape)
+            # # crop it according to the CAM_roi
+            # cropped = self.apply_roi_to_image(gray,
+            #                             CAM0_ROI_NPY if 'cam0' in img_filename else CAM1_ROI_NPY,
+            #                             output_path=None)
+            # Wc,Hc = cropped.shape
+
+            # underexposed_threshold = 50  # Example threshold for underexposure
+            # numOverexpPxl = (cropped==255).sum()
+            # numUnderexpPxl = (cropped<underexposed_threshold).sum()
+            # overExpPercent = 0.01
+            # underExpPercent = 0.7
+            # if numOverexpPxl>int(Wc*Hc*overExpPercent):
+            #     print(f'{numOverexpPxl}/({Wc}*{Hc}), {numOverexpPxl/Hc/Wc*100:.2f}% pixels are 255')
+            #     return "overexposed"
+            # elif numUnderexpPxl>int(Wc*Hc*underExpPercent):
+            #     print(f'{numUnderexpPxl}/({Wc}*{Hc}), {numUnderexpPxl/Hc/Wc*100:.2f}% pixels are below {underexposed_threshold}')
+            #     return "underexposed"
+            # else:
+            #     return "ok"
     def call_bash_script(camera_id, shutter, analoggain, output_dir, img_idx=0):
         os.makedirs(output_dir, exist_ok=True)
         print(f"Calling bash script for camera {camera_id} with shutter {shutter} and gain {analoggain}")
@@ -359,12 +440,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print('pressed green shoot')
         print(output_path)
         """Handle green camera shoot"""
-        shutter0 = str(self.spinBox_green_shutter.value()*1000) or "33000"
+        shutter0 = str(self.spinBox_green_shutter.value()) or "33"
         gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         print(shutter0,gain0)
         QApplication.processEvents()  # Update UI
         print(f'the output path is {output_path}')
-        output_fname = self.call_capture_still(0,shutter0,gain0,output_path,img_idx)
+        # output_fname = self.call_capture_still(0,shutter0,gain0,output_path,img_idx)
+        output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
+        print(f'output_fname:{output_fname}')
+        while os.path.exists(os.path.join(output_path,output_fname)) is False:
+            print(f"Waiting for Green image file to be created: {output_fname}")
+            time.sleep(1)
+        time.sleep(5)  # wait for file to be fully written
         t0 = time.perf_counter()
         exp_result = self.analyze_image(output_fname) # "ok","overexposed" or "underexposed"
         dt = time.perf_counter() - t0
@@ -376,11 +463,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             output_path = GUI_CAM1
         print('pressed UV shoot')
         """Handle green camera shoot"""
-        shutter1 = str(self.spinBox_uv_shutter.value()*1000) or "33000"
+        shutter1 = str(self.spinBox_uv_shutter.value()) or "33"
         gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
         print(shutter1,gain1)
         QApplication.processEvents()  # Update UI
-        output_fname = self.call_capture_still(1,shutter1,gain1,output_path,img_idx)
+        #output_fname = self.call_capture_still(1,shutter1,gain1,output_path,img_idx)
+        output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
+        while os.path.exists(os.path.join(output_path,output_fname)) is False:
+            print(f"Waiting for UV image file to be created: {output_fname}")
+            time.sleep(1)
+        time.sleep(5)  # wait for file to be fully written
         exp_result = self.analyze_image(output_fname) # "ok","overexposed" or "underexposed"
         print(f'{output_fname}:{exp_result}')
         
@@ -416,8 +508,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.label_tilt_toUpdatenumStep.setText(str(self.num_tilt))
         print(f"Updated parameters - Pan steps: {self.num_pan}, Tilt steps: {self.num_tilt}")
         print(f"will take total {self.num_pan*self.num_tilt} photos")  
-        
-        self.calculate_pano_positions()
     
     def calculate_pano_positions(self):
         if not hasattr(self,"pan_min") or not hasattr(self,'pan_step'):
@@ -429,13 +519,35 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
         return cam_path
     
-    # def on_start_scan(self):
+    def on_start_scan(self):
+        """Start calibration scan sequence"""
+        try:
+            self.on_update_parameters()
+            print(f"Starting SCAN calibration...")
+            cam_path = self.calculate_pano_positions()
+            print(f"Total positions to take CAM photos: {len(cam_path)}")
+            for idx, (pan, tilt) in enumerate(cam_path):
+                print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
+                self.stepper_controller.move_to(pan, tilt)
+                ## wait until the target position is reached
+                
+                time.sleep(1)  # wait for movement
+                
+                print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+                self.on_green_shoot(cam0_data_path,img_idx=idx)
+                # in E5 chessboard calibration
+                print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+                self.on_uv_shoot(cam1_data_path,img_idx=idx)
+                print(f"Waiting for ISI: {self.isi}s before next position...")
+        except Exception as e:
+            print(f"Error during SCAN calibration: {str(e)}")
         
     def on_start_cam(self):
         if not hasattr(self,"num_pan") or not hasattr(self,'num_tilt'):
             self.on_update_parameters()
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
             self.on_spec_scan()
+        self.calculate_pano_positions()
         start_time = time.strftime("%Y%m%d_%H%M%S")
         cam0_data_path = os.path.join(CHESS_PATH, f"cam0_{start_time}")
         cam1_data_path = os.path.join(CHESS_PATH, f"cam1_{start_time}")
@@ -478,6 +590,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.on_spec_scan()
         if not hasattr(self, 'num_pan') or not hasattr(self, 'num_tilt'):
             self.on_update_parameters()
+        self.calculate_pano_positions()
         print(f"Starting SCAM with Integration Time: {self.int_t}ms, ISI: {self.isi}s")
         
         cam_path = self.calculate_pano_positions()
