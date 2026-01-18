@@ -7,11 +7,13 @@ source "$CAMERA_CONFIG_PATH"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 # Main execution logic
-echo "$1" # caputre_raw
-echo "$2" # 0 camera id
-echo "$3" # 1.2 gain
-echo "$4" # 30 ms
-#
+echo "capture raw1?: $1" # caputre_raw
+echo "camera id2?: $2" # 0 camera id
+echo "gain3?: $3" # 1.2 gain
+echo "shutterms4?: $4" # 30 ms
+echo "outputdir5?: $5" # output dir
+echo "imgid6?: $6" # image index
+
 if [[ "$2" == "0" ]]; then
     echo "Using camera 0"
     RAW_CONFIG_PATH="$(dirname "${BASH_SOURCE[0]}")/../energy/green_raw_config.txt"
@@ -32,11 +34,11 @@ if [[ "$1" == "capture_raw" ]]; then
 
     libcamera-raw \
         --analoggain "${3}" \
-        --shutter "${4}" \
+        --shutter "${4}"ms \
         --config "$RAW_CONFIG_PATH" \
-        --metadata "./cam${2}_gain${3}_${4}ms.json" \
+        --metadata "${5}/cam${2}_gain${3}_${4}ms_${6}.json" \
         --timeout "$TIMEOUT_MS" \
-        -o "./cam${2}_gain${3}_${4}ms.raw"
+        -o "${5}/cam${2}_gain${3}_${4}ms_${6}.raw"
 
 elif [[ -z "$1" ]]; then
     echo "Default capture"
