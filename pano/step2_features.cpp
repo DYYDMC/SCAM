@@ -15,6 +15,9 @@ using std::vector;
 
 int main(int argc, char** argv)
 {
+    vector<Mat> images;
+images.reserve(argc - 1);
+
     if (argc < 3) {
         cout << "Usage: ./step2_features img1 img2 [img3 ...]" << endl;
         return -1;
@@ -43,6 +46,8 @@ int main(int argc, char** argv)
             cout << "Failed to load image: " << argv[i] << endl;
             return -1;
         }
+        // Store original image for later use
+        images.push_back(img16);
 
         // Convert to grayscale (still 16-bit)
         Mat gray16;
@@ -165,8 +170,51 @@ int main(int argc, char** argv)
             static_cast<float>(cameras[0].focal)
         )
     );
-    
-    
+
+    // ==============================
+    // STEP 8.1 — create masks
+    // ==============================
+    vector<Mat> masks(images.size());
+        for (size_t i = 0; i < images.size(); ++i) {
+            masks[i] = Mat(images[i].size(), CV_8U, Scalar::all(255));
+        }
+
+    // ==============================
+    // STEP 8.2 — prepare containers
+    // ==============================
+    vector<Mat> images_warped(images.size());
+    vector<Mat> masks_warped(images.size());
+    vector<Point> corners(images.size());
+    vector<Size> sizes(images.size());
+
+    // ==============================
+    // STEP 8.3 — warp loop
+    // ==============================
+    for (size_t i = 0; i < images.size(); ++i) {
+
+        Mat K = cameras[i].K().clone();
+        K.convertTo(K, CV_32F);
+
+        corners[i] = warper->warp(
+            images[i], K, cameras[i].R,
+            INTER_LINEAR, BORDER_REFLECT,
+            images_warped[i]
+        );
+
+        warper->warp(
+            masks[i], K, cameras[i].R,
+            INTER_NEAREST, BORDER_CONSTANT,
+            masks_warped[i]
+        );
+
+        sizes[i] = images_warped[i].size();
+
+        cout << "Warped image " << i
+            << " size=" << sizes[i]
+            << " corner=" << corners[i]
+            << endl;
+    }
+
 
     return 0;
 }
