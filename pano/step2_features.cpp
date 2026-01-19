@@ -1,5 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/stitching/detail/matchers.hpp>
+#include <opencv2/stitching/detail/warpers.hpp>
+// where : /usr/include/opencv4/opencv2/stitching/detail/warpers.hpp
 
 #include <iostream>
 #include <vector>
@@ -157,12 +159,14 @@ int main(int argc, char** argv)
     }
     cout << "bundle adjustment finished successfully." << endl;
 
-    // // warping
-    // Ptr<WarperCreator> warper_creator =
-    //     makePtr<CylindricalWarper>();
-
-    // Ptr<RotationWarper> warper =
-    //     warper_creator->create(cameras[0].focal);
+    // warping
+    Ptr<cv::detail::RotationWarper> warper(
+        new cv::detail::CylindricalWarper(
+            static_cast<float>(cameras[0].focal)
+        )
+    );
+    
+    
 
     return 0;
 }
