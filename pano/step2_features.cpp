@@ -108,23 +108,23 @@ int main(int argc, char** argv)
          << pairwise_matches.size()
          << endl;
     
-    // HomographyBasedEstimator estimator;
-    // std::vector<CameraParams> cameras;
+    // camera estimation
+    HomographyBasedEstimator estimator;
+    std::vector<CameraParams> cameras;
     
+    if (!estimator(features, pairwise_matches, cameras)) {
+        cout << "Homography estimation failed" << endl;
+        return -1;
+    }
 
-    // if (!estimator(features, pairwise_matches, cameras)) {
-    //     cout << "Homography estimation failed" << endl;
-    //     return -1;
-    // }
-
-    // // sanity check
-    // for (size_t i = 0; i < cameras.size(); ++i) {
-    //     cout << "Camera " << i
-    //          << " focal=" << cameras[i].focal
-    //          << endl;
-    // }
-    // for (auto& cam : cameras)
-    //     cam.R = cam.R.clone();  // REQUIRED
+    // sanity check
+    for (size_t i = 0; i < cameras.size(); ++i) {
+        cout << "Camera " << i
+             << " focal=" << cameras[i].focal
+             << endl;
+    }
+    for (auto& cam : cameras)
+        cam.R = cam.R.clone();  // REQUIRED
          
-    // return 0;
+    return 0;
 }
