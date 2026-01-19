@@ -19,7 +19,14 @@ int main(int argc, char** argv)
     }
 
     // Create SIFT detector
-    Ptr<SIFT> sift = SIFT::create();
+    //Ptr<SIFT> sift = SIFT::create();
+    Ptr<SIFT> sift = SIFT::create(
+        0,        // nfeatures (0 = unlimited)
+        3,        // nOctaveLayers
+        0.01,     // contrastThreshold (DEFAULT 0.04 → LOWER THIS)
+        10,       // edgeThreshold
+        1.6       // sigma
+    );
 
     // Prepare feature container
     vector<ImageFeatures> features(argc - 1);
@@ -67,13 +74,57 @@ int main(int argc, char** argv)
             cout << "ERROR: No descriptors found." << endl;
             return -1;
         }
-
+        
+        
         cout << "Image " << (i - 1)
-             << ": keypoints = "
-             << features[i - 1].keypoints.size()
-             << endl;
+            << ": keypoints = "
+            << features[i - 1].keypoints.size()
+            << endl;
     }
 
     cout << "Feature extraction finished successfully." << endl;
-    return 0;
+
+    BestOf2NearestMatcher matcher(
+        false,   // try_use_gpu
+        0.3f     // match confidence
+    );
+    
+    std::vector<MatchesInfo> pairwise_matches;
+    
+    // // OpenCV 4.6 syntax
+    matcher(features, pairwise_matches);
+    // // sanity check
+    // for (size_t i = 0; i < pairwise_matches.size(); ++i) {
+    //     cout << "Pair " << i
+    //          << "  src=" << pairwise_matches[i].src_img_idx
+    //          << "  dst=" << pairwise_matches[i].dst_img_idx
+    //          << "  inliers=" << pairwise_matches[i].num_inliers
+    //          << endl;
+    // }    
+    
+    matcher.collectGarbage();
+    
+    cout << "Pairwise matches computed: "
+         << pairwise_matches.size()
+         << endl;
+    
+    // HomographyBasedEstimator estimator;
+    // std::vector<CameraParams> cameras;
+    
+
+    // if (!estimator(features, pairwise_matches, cameras)) {
+    //     cout << "Homography estimation failed" << endl;
+    //     return -1;
+    // }
+
+    // // sanity check
+    // for (size_t i = 0; i < cameras.size(); ++i) {
+    //     cout << "Camera " << i
+    //          << " focal=" << cameras[i].focal
+    //          << endl;
+    // }
+    // for (auto& cam : cameras)
+    //     cam.R = cam.R.clone();  // REQUIRED
+         
+    // return 0;
 }
