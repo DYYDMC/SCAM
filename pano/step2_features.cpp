@@ -123,8 +123,46 @@ int main(int argc, char** argv)
              << " focal=" << cameras[i].focal
              << endl;
     }
-    for (auto& cam : cameras)
-        cam.R = cam.R.clone();  // REQUIRED
-         
+    // for (auto& cam : cameras)
+    //     cam.R = cam.R.clone();  // REQUIRED
+
+    // transfore homographyBasedEstimator from double to float
+    for (auto& cam : cameras) {
+        cam.R.convertTo(cam.R, CV_32F);
+    }
+    cout << "Camera estimation finished successfully." << endl;
+    
+    // bundle adjustment
+    BundleAdjusterReproj adjuster;
+    adjuster.setConfThresh(1.0);
+
+    Mat refine_mask = Mat::zeros(3, 3, CV_8U);
+    refine_mask.at<uchar>(0,0) = 1;
+    refine_mask.at<uchar>(0,1) = 1;
+    refine_mask.at<uchar>(0,2) = 1;
+    refine_mask.at<uchar>(1,1) = 1;
+
+    adjuster.setRefinementMask(refine_mask);
+
+    if (!adjuster(features, pairwise_matches, cameras)) {
+        cout << "Bundle adjustment failed" << endl;
+        return -1;
+    }
+
+    // sanity check on the focal length after bundle adjustment
+    for (size_t i = 0; i < cameras.size(); ++i) {
+        cout << "Camera " << i
+             << " focal=" << cameras[i].focal
+             << endl;
+    }
+    cout << "bundle adjustment finished successfully." << endl;
+
+    // // warping
+    // Ptr<WarperCreator> warper_creator =
+    //     makePtr<CylindricalWarper>();
+
+    // Ptr<RotationWarper> warper =
+    //     warper_creator->create(cameras[0].focal);
+
     return 0;
 }
