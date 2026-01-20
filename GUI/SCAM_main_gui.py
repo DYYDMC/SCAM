@@ -589,13 +589,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.on_update_parameters()
             print(f"Starting SCAN two positions:")
             print(f"ground:{self.pan_oneScan},{self.tilt_min}),sky:({self.pan_oneScan},{self.pan_max})")
-
+            self.ground_int_scan = self.int_oneScan
+            self.sky_int_scan = self.int_oneScan
             for tt in range(2):
                 pan = self.pan_oneScan
                 tilt = self.tilt_min
                 self.stepper_controller.move_to(pan, tilt)
                 time.sleep(self.isi_oneScan)  # wait for movement
-                result_ground = self.spec_controller.scan(self.int_oneScan)
+                result_ground = self.spec_controller.scan(self.ground_int_scan)
+                while np.max(result_ground['intensity'])/16000<0.5:
+                    self.ground_int_scan = int(self.ground_int_scan*16000/np.max(result_ground['intensity']))
+                    result_ground = self.spec_controller.scan(self.ground_int_scan)
                 result_ground['motor_pan'] = pan
                 result_ground['motor_tilt'] = tilt
                 result_ground['ts'] = time.strftime("%Y%m%d_%H%M%S")
@@ -607,6 +611,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.stepper_controller.move_to(pan, tilt)
                 time.sleep(self.isi_oneScan)  # wait for movement
                 result_sky = self.spec_controller.scan(self.int_oneScan)
+                while np.max(result_ground['intensity'])/16000<0.5:
+                    self.ground_int_scan = int(self.ground_int_scan*16000/np.max(result_ground['intensity']))
+                    result_ground = self.spec_controller.scan(self.ground_int_scan)
                 result_sky['motor_pan'] = pan
                 result_sky['motor_tilt'] = tilt
                 result_sky['ts'] = time.strftime("%Y%m%d_%H%M%S")
