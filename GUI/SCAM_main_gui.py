@@ -360,6 +360,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             else:
                 return "ok"
         if ".raw" in img_filename:
+            print('HA!HA!HA!HA!HA!HA!HA!HA!HA!HA!HA!HA!')
             stride = 8128
             width, height = 4056, 3040
             # self.raw_stride = 8128
@@ -374,43 +375,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             image = raw_2d[:, :width]  # Crop to actual width
             print(image.shape)
             print(f'for imag:{img_filename})')
+            print(f'max_pixel_value:{image.max()}')
+            increase_factor = 15000/image.mean() # all circular 65220
+            img_mean = image.mean()
+            print(f'increase_factor:{increase_factor}')
             print(f'mean_pixel_value:{image.mean()}')
             print(f'image shape:{image.shape}')
             plt.imshow(image,cmap='gray')
             plt.savefig(img_filename.replace('.raw','.png'))
-            
             np.save(img_filename.replace('.raw','.npy'),image)
             
-            # # Read raw image
-            # with open(img_filename, 'rb') as f:
-            #     raw_data = f.read()
-            # # Assuming a fixed resolution for simplicity; adjust as needed
-            # width, height = 4056, 3040  # Example resolution
-            # img = np.frombuffer(raw_data, dtype=np.uint8).reshape((height, width))
-            # if 'cam0' in img_filename:
-            #     gray = img  # Assuming cam0 is grayscale
-            # if 'cam1' in img_filename:
-            #     gray = img  # Assuming cam1 is grayscale
-            # print(gray.shape)
-            # # crop it according to the CAM_roi
-            # cropped = self.apply_roi_to_image(gray,
-            #                             CAM0_ROI_NPY if 'cam0' in img_filename else CAM1_ROI_NPY,
-            #                             output_path=None)
-            # Wc,Hc = cropped.shape
-
-            # underexposed_threshold = 50  # Example threshold for underexposure
-            # numOverexpPxl = (cropped==255).sum()
-            # numUnderexpPxl = (cropped<underexposed_threshold).sum()
-            # overExpPercent = 0.01
-            # underExpPercent = 0.7
-            # if numOverexpPxl>int(Wc*Hc*overExpPercent):
-            #     print(f'{numOverexpPxl}/({Wc}*{Hc}), {numOverexpPxl/Hc/Wc*100:.2f}% pixels are 255')
-            #     return "overexposed"
-            # elif numUnderexpPxl>int(Wc*Hc*underExpPercent):
-            #     print(f'{numUnderexpPxl}/({Wc}*{Hc}), {numUnderexpPxl/Hc/Wc*100:.2f}% pixels are below {underexposed_threshold}')
-            #     return "underexposed"
-            # else:
-            #     return "ok"
+            return increase_factor,img_mean
     def call_bash_script(camera_id, shutter, analoggain, output_dir, img_idx=0):
         os.makedirs(output_dir, exist_ok=True)
         print(f"Calling bash script for camera {camera_id} with shutter {shutter} and gain {analoggain}")
@@ -452,11 +427,57 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Waiting for Green image file to be created: {output_fname}")
             time.sleep(1)
         time.sleep(5)  # wait for file to be fully written
-        t0 = time.perf_counter()
-        exp_result = self.analyze_image(output_fname) # "ok","overexposed" or "underexposed"
-        dt = time.perf_counter() - t0
-        print(f'took {dt} to execute the analyze_image()')
-        print(f'{output_fname}:{exp_result}')
+        #t0 = time.perf_counter()
+        if '.raw' in output_fname:
+            increase_factor,img_mean = self.analyze_image(output_fname)
+            self.cam0_mean0 = img_mean
+            increase_factor = max(increase_factor,self.cam1_mean2/self.cam0_mean0)
+            if increase_factor>1:
+                if float(shutter0)*increase_factor<=1000:
+                    shutter02=str(self.spinBox_green_shutter.value()*increase_factor)
+                    output_fname2 = self.call_libcamera_raw(0,shutter02,gain0,output_path,img_idx)
+                elif float(gain0)*increase_factor<=8:
+                    gain02 = str(self.doubleSpinBox_green_gain.value()*increase_factor)
+                    output_fname2 = self.call_libcamera_raw(0,shutter0,gain02,output_path,img_idx)
+                else:
+                    print('lets do the 1000ms and 8gain')
+                    shutter02="1000"
+                    gain02="8"
+                    output_fname2 = self.call_libcamera_raw(0,shutter02,gain02,output_path,img_idx)
+            
+            else:
+                shutter02="1000"
+                gain02="8"
+                output_fname2 = self.call_libcamera_raw(0,shutter02,gain02,output_path,img_idx)
+            print("?????????????")
+            print(output_fname2)
+            while os.path.exists(os.path.join(output_path,output_fname2)) is False:
+                print(f"Waiting for UV image file to be created: {output_fname2}")
+                time.sleep(1)
+            time.sleep(5)  # wait for file to be fully written
+            
+            stride = 8128
+            width, height = 4056, 3040
+            # self.raw_stride = 8128
+            row_bytes = stride
+            frame_bytes = row_bytes * 3040
+            with open(output_fname2, 'rb') as f:
+                f.seek(0 * frame_bytes)
+                raw_frame = f.read(frame_bytes)
+            raw_data = np.frombuffer(raw_frame, dtype=np.uint16)
+            full_width = stride // 2  # since each pixel is 2 bytes
+            raw_2d = raw_data.reshape((height, full_width))
+            image = raw_2d[:, :width]  # Crop to actual width
+            print(image.shape)
+            print(f'for imag:{output_fname2})')
+            print(f'max_pixel_value:{image.max()}')
+            increase_factor = 65220/image.max()
+            print(f'increase_factor:{increase_factor}')
+            print(f'mean_pixel_value:{image.mean()}')
+            print(f'image shape:{image.shape}')
+            plt.imshow(image,cmap='gray')
+            plt.savefig(output_fname2.replace('.raw','.png'))
+            np.save(output_fname2.replace('.raw','.npy'),image)
         
     def on_uv_shoot(self,output_path=None,img_idx=0):
         if output_path is False:
@@ -473,23 +494,57 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Waiting for UV image file to be created: {output_fname}")
             time.sleep(1)
         time.sleep(5)  # wait for file to be fully written
-        exp_result = self.analyze_image(output_fname) # "ok","overexposed" or "underexposed"
-        print(f'{output_fname}:{exp_result}')
         
-        # while self.cam1_overExp != 'ok':
-        #     print(f"Green camera shoot clicked - Shutter: {shutter1}ms, Gain: {gain1}")
-        #     print(f"target path{output_path}, no.{img_idx} img")
-        #     QApplication.processEvents()  # Update UI
-        #     output_fname = self.call_capture_still(1,shutter1,gain1,output_path,img_idx)
-        #     exp_result = self.analyze_image(output_fname) # "ok","overexposed" or "underexposed"
-        #     if exp_result == 'ok':
-        #         self.cam1_exp_combo.append((shutter1,gain1))
-        #     else:
-        #         os.remove(output_fname)
-        #         direction_change = "increase" if result == "underexposed" else "decrease"
-        #         self.cam1_gain_range =self.update_range(GAIN_SEARCH_RANGE, gain1, direction_change)
-        #         self.cam1_shutter_range =self.update_range(SHUTTER_SEARCH_RANGE, shutter1, direction_change)
-
+        if '.raw' in output_fname:
+            increase_factor,img_mean= self.analyze_image(output_fname)
+            self.cam1_mean1 = img_mean
+            if increase_factor>1:
+                print(f'increase_factor {increase_factor} > 1')
+                if (float(shutter1)*increase_factor)<=1000:
+                    shutter12=str(self.spinBox_uv_shutter.value()*increase_factor)
+                    output_fname2 = self.call_libcamera_raw(1,shutter12,gain1,output_path,img_idx)
+                elif float(gain1)*increase_factor<=8:
+                    gain12 = str(self.doubleSpinBox_uv_gain.value()*increase_factor)
+                    output_fname2 = self.call_libcamera_raw(1,shutter1,gain12,output_path,img_idx)
+                else:
+                    print('lets do the 1000ms and 8gain')
+                    shutter12="1000"
+                    gain12="8"
+                    output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
+            else:
+                shutter12="1000"
+                gain12="8"
+                output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
+            print("???UV??????????")
+            while os.path.exists(os.path.join(output_path,output_fname2)) is False:
+                print(f"Waiting for UV image file to be created: {output_fname2}")
+                time.sleep(1)
+            time.sleep(5)  # wait for file to be fully written
+            
+            stride = 8128
+            width, height = 4056, 3040
+            # self.raw_stride = 8128
+            row_bytes = stride
+            frame_bytes = row_bytes * 3040
+            with open(output_fname2, 'rb') as f:
+                f.seek(0 * frame_bytes)
+                raw_frame = f.read(frame_bytes)
+            raw_data = np.frombuffer(raw_frame, dtype=np.uint16)
+            full_width = stride // 2  # since each pixel is 2 bytes
+            raw_2d = raw_data.reshape((height, full_width))
+            image = raw_2d[:, :width]  # Crop to actual width
+            print(image.shape)
+            print(f'for imag:{output_fname2})')
+            print(f'max_pixel_value:{image.max()}')
+            increase_factor = 65220/image.max()
+            print(f'increase_factor:{increase_factor}')
+            print(f'mean_pixel_value:{image.mean()}')
+            print(f'image shape:{image.shape}')
+            plt.imshow(image,cmap='gray')
+            plt.savefig(output_fname2.replace('.raw','.png'))
+            np.save(output_fname2.replace('.raw','.npy'),image)
+            _,img_mean= self.analyze_image(output_fname2)
+            self.cam1_mean2 = img_mean
     def on_both_shoot(self):
         """Handle both cameras shoot"""
         self.on_green_shoot()
@@ -564,11 +619,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             time.sleep(1)  # wait for movement
             
+            print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+            self.on_uv_shoot(cam1_data_path,img_idx=idx)
             print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_green_shoot(cam0_data_path,img_idx=idx)
             # in E5 chessboard calibration
-            print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_uv_shoot(cam1_data_path,img_idx=idx)
+            
             print(f"Waiting for ISI: {self.isi}s before next position...")
             
     def on_start_scam(self):
