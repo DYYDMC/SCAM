@@ -1,5 +1,9 @@
-import os
+#!/usr/bin/env python3
+import seabreeze
+seabreeze.use('pyseabreeze')  # Use the Python backend
 import seabreeze.spectrometers as sb
+
+import os
 import numpy as np
 import json
 from datetime import datetime
@@ -18,10 +22,13 @@ class SpectrometerController:
         """Initialize and connect to spectrometer"""
         try:
             if self.spec is None:
+                devices = sb.list_devices()
+                print(f"Found {len(devices)} device(s): {devices}")
                 #self.spec = sb.Spectrometer.from_serial_number("S03615") # STS-UV
                 # self.spec = sb.Spectrometer.from_serial_number("USB2+F02461")
-                self.spec = sb.Spectrometer.from_serial_number("S15434") # STS-VIS
-                
+                #self.spec = sb.Spectrometer.from_serial_number("S15434") # STS-VIS
+                #self.spec = sb.Spectrometer.from_serial_number("ST03283") # ST-UV
+                self.spec = sb.Spectrometer(devices[0])
                 self.is_connected = True
                 print(f'Spectrometer connected: {self.spec.serial_number}')
                 return True
