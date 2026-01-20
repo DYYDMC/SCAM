@@ -37,6 +37,7 @@ SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
 ROI_PATH = os.path.join(SCAM_PATH, "roi")
 DATA_PATH = os.path.join(SCAM_PATH, "data")
+SCAN_DATA_PATH = os.path.join(SCAM_PATH, "scan")
 EXP_SEARCH_PATH = os.path.join(SCAM_PATH, "exp_search")
 CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
 CALI_PATH = os.path.join(SCAM_PATH,"cali")
@@ -550,6 +551,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.on_green_shoot()
         self.on_uv_shoot()
     def on_update_parameters(self):
+        """"Update parameters from UI"""
         self.pan_min = self.spinBox_pan_min.value()
         self.pan_max = self.spinBox_pan_max.value()
         self.pan_step = self.spinBox_pan_stepsize.value()
@@ -562,7 +564,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.num_tilt = int((self.tilt_max - self.tilt_min)/self.tilt_step) + 1
         self.label_tilt_toUpdatenumStep.setText(str(self.num_tilt))
         print(f"Updated parameters - Pan steps: {self.num_pan}, Tilt steps: {self.num_tilt}")
-        print(f"will take total {self.num_pan*self.num_tilt} photos")  
+        print(f"will take total {self.num_pan*self.num_tilt} photos")
+        
+        self.pan_oneScan = self.spinBox_pan_oneScan.value()
+        self.tilt_oneScan = self.spinBox_tilt_oneScan.value()
+        self.int_oneScan = self.spinBox_int_oneScan.value()
+        self.isi_oneScan = self.spinBox_isi_oneScan.value()
     
     def calculate_pano_positions(self):
         if not hasattr(self,"pan_min") or not hasattr(self,'pan_step'):
@@ -573,8 +580,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f"total positions: {len(pan_positions)*len(tilt_positions)}")
         cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
         return cam_path
-    
     def on_start_scan(self):
+        start_time = time.strftime("%Y%m%d_%H%M%S")
+        scan_save_path = os.path.join(SCAN_DATA_PATH, f"SCAM_{start_time}")
+        """Start solely spectral scan"""
+        # scan one visual angle in the sky -> one visual angle in the ground
+        try:
+            self.on_update_parameters()
+            print(f"Starting SCAN two positions:")
+            print(f"ground:{self.pan_oneScan},{self.tilt_min}),sky:({self.pan_oneScan},{self.pan_max})")
+
+            for tt in range(2):
+                pan = self.pan_oneScan
+                tilt = self.tilt_min
+                self.stepper_controller.move_to(pan, tilt)
+                time.sleep(self.isi_oneScan)  # wait for movement
+                result_ground = self.spec_controller.scan(self.int_oneScan)
+                result_ground['motor_pan'] = pan
+                result_ground['motor_tilt'] = tilt
+                result_ground['ts'] = time.strftime("%Y%m%d_%H%M%S")
+                data_filename = os.path.join(scan_save_path, f"/ground_scan.pkl")
+                np.save(data_filename,result_ground)
+                print(f'saved to{data_filename}')
+                
+                tilt = self.tilt_max
+                self.stepper_controller.move_to(pan, tilt)
+                time.sleep(self.isi_oneScan)  # wait for movement
+                result_sky = self.spec_controller.scan(self.int_oneScan)
+                result_sky['motor_pan'] = pan
+                result_sky['motor_tilt'] = tilt
+                result_sky['ts'] = time.strftime("%Y%m%d_%H%M%S")
+                data_filename = os.path.join(scan_save_path, f"/sky_scan.pkl")
+                np.save(data_filename,result_sky)
+                print(f'saved to{data_filename}')
+                
+                # scan
+                
+        except Exception as e:
+            print(f"Error during SCAN calibration: {str(e)}")
+    def on_start_scan_cali(self):
         """Start calibration scan sequence"""
         try:
             self.on_update_parameters()
