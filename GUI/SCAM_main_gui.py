@@ -337,7 +337,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return cropped
     def analyze_spectrum(self,intensity,target_max_value=16383):
         max_intensity = intensity.max()
-        increase_factor = target_max_value / max_intensity
+        increase_factor = max_intensity/target_max_value
         print(f'Max intensity: {max_intensity}, Increase factor: {increase_factor}')
         return increase_factor
     def analyze_image(self,img_filename,target_mean_value=15000):
