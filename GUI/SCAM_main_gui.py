@@ -30,6 +30,7 @@ print(project_root)
 from spec_scan.spectrometer_controller import SpectrometerController
 # from rs_motor.rcmotor_controller import MotorController
 from stepper.OS_end.steppers import StepperController
+from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw,extract_R_raw, adjust_shutter_gain
 
 # define paths
 HOME = os.path.expanduser("~")
@@ -330,7 +331,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Saved cropped image: {output_path} (Size: {cropped.shape[1]}x{cropped.shape[0]})")
         return cropped
 
-    def analyze_image(self,img_filename):
+    def analyze_image(self,img_filename,target_mean_value=15000):
         if ".jpg" in img_filename:
             # Open the image
             print(img_filename)
@@ -361,30 +362,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             else:
                 return "ok"
         if ".raw" in img_filename:
-            print('HA!HA!HA!HA!HA!HA!HA!HA!HA!HA!HA!HA!')
-            stride = 8128
-            width, height = 4056, 3040
-            # self.raw_stride = 8128
-            row_bytes = stride
-            frame_bytes = row_bytes * 3040
-            with open(img_filename, 'rb') as f:
-                f.seek(0 * frame_bytes)
-                raw_frame = f.read(frame_bytes)
-            raw_data = np.frombuffer(raw_frame, dtype=np.uint16)
-            full_width = stride // 2  # since each pixel is 2 bytes
-            raw_2d = raw_data.reshape((height, full_width))
-            image = raw_2d[:, :width]  # Crop to actual width
-            print(image.shape)
-            print(f'for imag:{img_filename})')
-            print(f'max_pixel_value:{image.max()}')
-            increase_factor = 15000/image.mean() # all circular 65220
-            img_mean = image.mean()
+            print('processing raw image:',img_filename)
+            # read the raw and cute the black lines
+            raw_2d = cut_raw_black_lines(img_filename)
+            
+            if 'cam1' in img_filename:
+                raw_chan = extract_B_raw(raw_2d)
+            if 'cam0' in img_filename:
+                raw_chan = extract_G_raw(raw_2d)
+            
+            increase_factor = target_mean_value/raw_chan.mean() # all circular 65220
+            img_mean = raw_chan.mean()
             print(f'increase_factor:{increase_factor}')
-            print(f'mean_pixel_value:{image.mean()}')
-            print(f'image shape:{image.shape}')
-            plt.imshow(image,cmap='gray')
-            plt.savefig(img_filename.replace('.raw','.png'))
-            np.save(img_filename.replace('.raw','.npy'),image)
+            print(f'mean_pixel_value:{raw_chan.mean()}')
+            plt.imshow(raw_chan,cmap='gray')
+            if "cam0" in img_filename:
+                plt.savefig(img_filename.replace('.raw','_G.png'))
+                np.save(img_filename.replace('.raw','_G.npy'),raw_chan)
+            if "cam1" in img_filename:
+                plt.savefig(img_filename.replace('.raw','_B.png'))
+                np.save(img_filename.replace('.raw','_B.npy'),raw_chan)
             
             return increase_factor,img_mean
     def call_bash_script(camera_id, shutter, analoggain, output_dir, img_idx=0):
@@ -430,54 +427,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         time.sleep(5)  # wait for file to be fully written
         #t0 = time.perf_counter()
         if '.raw' in output_fname:
-            increase_factor,img_mean = self.analyze_image(output_fname)
-            self.cam0_mean0 = img_mean
-            increase_factor = max(increase_factor,self.cam1_mean2/self.cam0_mean0)
-            if increase_factor>1:
-                if float(gain0)*increase_factor<8:
-                    gain02 = str(int(self.doubleSpinBox_green_gain.value()*increase_factor*0.8)+1)
-                    output_fname2 = self.call_libcamera_raw(0,shutter0,gain02,output_path,img_idx)
-                elif float(shutter0)*increase_factor<=1000:
-                    shutter02=str(self.spinBox_green_shutter.value()*increase_factor)
-                    output_fname2 = self.call_libcamera_raw(0,shutter02,gain0,output_path,img_idx)
-                else:
-                    print('lets do the 1000ms and 8gain')
-                    shutter02="1000"
-                    gain02="8"
-                    output_fname2 = self.call_libcamera_raw(0,shutter02,gain02,output_path,img_idx)
+            increase_factor1,img_mean = self.analyze_image(output_fname,target_mean_value=self.cam1_mean1)
+            os.system('rm '+output_fname.replace('.raw','.*'))
             
-            else:
-                shutter02="1000"
-                gain02="8"
-                output_fname2 = self.call_libcamera_raw(0,shutter02,gain02,output_path,img_idx)
-            print("?????????????")
-            print(output_fname2)
+            shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), increase_factor1)
+            output_fname=self.call_libcamera_raw(0,shutter00,gain00,output_path,img_idx)
+            while os.path.exists(os.path.join(output_path,output_fname)) is False:
+                print(f"Waiting for UV image file to be created: {output_fname}")
+                time.sleep(1)
+            time.sleep(5)  # wait for file to be fully written
+            increase_factor2,img_mean = self.analyze_image(output_fname,target_mean_value=self.cam1_mean2)
+            
+            shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), increase_factor2)
+            output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
             while os.path.exists(os.path.join(output_path,output_fname2)) is False:
                 print(f"Waiting for UV image file to be created: {output_fname2}")
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
-            
-            stride = 8128
-            width, height = 4056, 3040
-            # self.raw_stride = 8128
-            row_bytes = stride
-            frame_bytes = row_bytes * 3040
-            with open(output_fname2, 'rb') as f:
-                f.seek(0 * frame_bytes)
-                raw_frame = f.read(frame_bytes)
-            raw_data = np.frombuffer(raw_frame, dtype=np.uint16)
-            full_width = stride // 2  # since each pixel is 2 bytes
-            raw_2d = raw_data.reshape((height, full_width))
-            image = raw_2d[:, :width]  # Crop to actual width
-            print(image.shape)
-            print(f'for imag:{output_fname2})')
-            print(f'max_pixel_value:{image.max()}')
-            #increase_factor = 65220/image.max()
-            #print(f'increase_factor:{increase_factor}')
-            print(f'mean_pixel_value:{image.mean()}')
-            plt.imshow(image,cmap='gray')
-            plt.savefig(output_fname2.replace('.raw','.png'))
-            np.save(output_fname2.replace('.raw','.npy'),image)
+            _,_= self.analyze_image(output_fname2)
         
     def on_uv_shoot(self,output_path=None,img_idx=0):
         if output_path is False:
@@ -488,7 +455,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
         print(shutter1,gain1)
         QApplication.processEvents()  # Update UI
-        #output_fname = self.call_capture_still(1,shutter1,gain1,output_path,img_idx)
+        # take the uv_photo with cam1
         output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
         while os.path.exists(os.path.join(output_path,output_fname)) is False:
             print(f"Waiting for UV image file to be created: {output_fname}")
@@ -498,51 +465,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if '.raw' in output_fname:
             increase_factor,img_mean= self.analyze_image(output_fname)
             self.cam1_mean1 = img_mean
-            if increase_factor>1:
-                print(f'increase_factor {increase_factor} > 1')
-                if (float(shutter1)*increase_factor)<=1000:
-                    shutter12=str(int(self.spinBox_uv_shutter.value()*increase_factor))
-                    output_fname2 = self.call_libcamera_raw(1,shutter12,gain1,output_path,img_idx)
-                elif float(gain1)*increase_factor<8:
-                    gain12 = str(int(self.doubleSpinBox_uv_gain.value()*increase_factor)+1)
-                    output_fname2 = self.call_libcamera_raw(1,shutter1,gain12,output_path,img_idx)
-                else:
-                    print('lets do the 1000ms and 8gain')
-                    shutter12="1000"
-                    gain12="8"
-                    output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
-            else:
-                shutter12="1000"
-                gain12="8"
-                output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
+            self.shutter1 = shutter1
+            self.gain1 = gain1
+            shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
+            output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
             print("???UV??????????")
             while os.path.exists(os.path.join(output_path,output_fname2)) is False:
                 print(f"Waiting for UV image file to be created: {output_fname2}")
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
             
-            stride = 8128
-            width, height = 4056, 3040
-            # self.raw_stride = 8128
-            row_bytes = stride
-            frame_bytes = row_bytes * 3040
-            with open(output_fname2, 'rb') as f:
-                f.seek(0 * frame_bytes)
-                raw_frame = f.read(frame_bytes)
-            raw_data = np.frombuffer(raw_frame, dtype=np.uint16)
-            full_width = stride // 2  # since each pixel is 2 bytes
-            raw_2d = raw_data.reshape((height, full_width))
-            image = raw_2d[:, :width]  # Crop to actual width
-            print(image.shape)
-            print(f'for imag:{output_fname2})')
-            print(f'max_pixel_value:{image.max()}')
-            # increase_factor = 65220/image.max()
-            #print(f'increase_factor:{increase_factor}')
-            print(f'mean_pixel_value:{image.mean()}')
-            plt.imshow(image,cmap='gray')
-            plt.savefig(output_fname2.replace('.raw','.png'))
-            np.save(output_fname2.replace('.raw','.npy'),image)
-            _,img_mean= self.analyze_image(output_fname2)
+            _,_= self.analyze_image(output_fname2)
             self.cam1_mean2 = img_mean
     def on_both_shoot(self):
         """Handle both cameras shoot"""
@@ -677,7 +610,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.on_update_parameters()
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
             self.on_spec_scan()
-        self.calculate_pano_positions()
+            
         start_time = time.strftime("%Y%m%d_%H%M%S")
         cam0_data_path = os.path.join(CHESS_PATH, f"cam0_{start_time}")
         cam1_data_path = os.path.join(CHESS_PATH, f"cam1_{start_time}")
@@ -701,6 +634,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # in E5 chessboard calibration
             
             print(f"Waiting for ISI: {self.isi}s before next position...")
+            self.cam1_ground_mean = None
+            self.cam1_sky_mean = None
+            self.cam0_ground_mean = None
+            self.cam0_sky_mean = None
+            
+            
             
     def on_start_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
