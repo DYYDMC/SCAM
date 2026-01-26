@@ -520,11 +520,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def calculate_pano_positions(self):
         if not hasattr(self,"pan_min") or not hasattr(self,'pan_step'):
             self.on_update_parameters()
-        pan_positions = np.arange(self.pan_min, self.pan_max + self.pan_step, self.pan_step)
-        tilt_positions = np.arange(self.tilt_min, self.tilt_max + self.tilt_step, self.tilt_step)
-        print(f"num Pan positions: {len(pan_positions)}, num Tilt positions: {len(tilt_positions)}")
-        print(f"total positions: {len(pan_positions)*len(tilt_positions)}")
-        cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
+        self.pan_positions = np.arange(self.pan_min, self.pan_max + self.pan_step, self.pan_step)
+        self.tilt_positions = np.arange(self.tilt_min, self.tilt_max + self.tilt_step, self.tilt_step)
+        print(f"num Pan positions: {len(self.pan_positions)}, num Tilt positions: {len(self.tilt_positions)}")
+        print(f"total positions: {len(self.pan_positions)*len(self.tilt_positions)}")
+        cam_path = [(pp,tt) for tt in self.tilt_positions for pp in self.pan_positions]
         return cam_path
     def on_start_full_scan(self):
         print("I AM HERE!! FULL SCAN!")
@@ -538,33 +538,36 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pan_step = 1
             self.tilt_step = 1
             cam_path = self.calculate_pano_positions()
+            # save the scan positions
             np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=cam_path)
-            
             for idx, (pan, tilt) in enumerate(cam_path):
                 print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
                 self.stepper_controller.move_to(pan, tilt)
                 time.sleep(self.isi_oneScan)  # wait for movement
+                if idx%len(self.pan_positions)==0:
+                    print(f"At tilt position: {tilt} degrees")
+                    time.sleep(int(0.5*len(self.pan_positions)+1))  # extra wait time for tilt change
                 tmp_ = self.spec_controller.scan(self.int_oneScan)
                 tmp_ints = tmp_["intensity"]
                 increase_factor = self.analyze_spectrum(tmp_ints) # max/16383
-                while increase_factor>0.95 or increase_factor<0.5:
+                while increase_factor>0.95 or increase_factor<0.3:
                     if increase_factor>.95:
                         self.int_oneScan = int(self.int_oneScan*0.95)
-                    if increase_factor<0.5:
+                    if increase_factor<0.3:
                         self.int_oneScan = int(self.int_oneScan*1.15)
                     time.sleep(1)
                     print(f'Updated integration time to:{self.int_oneScan} ms')
                     tmp_ = self.spec_controller.scan(self.int_oneScan)
                     tmp_ints = tmp_["intensity"]
                     increase_factor = self.analyze_spectrum(tmp_ints)
-                
+                time.sleep(1)
                 result_= self.spec_controller.scan(self.int_oneScan)
                 result_['motor_pan'] = pan
                 result_['motor_tilt'] = tilt
                 result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                data_filename = os.path.join(scan_save_path, f"sky_scan{tt}")
+                data_filename = os.path.join(scan_save_path, f"full_scan_{idx}")
                 np.save(data_filename,result_)
-                print(f"Waiting for ISI: {self.isi}s before next position...")
+                print(f"Waiting for ISI: {self.isi_oneScan}s before next position...")
         except Exception as e:
             print(f"Error during full scan: {str(e)}")
         
