@@ -8,6 +8,7 @@ import subprocess
 import sys
 import os
 import json
+import tifffile as tiff
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMainWindow,QGraphicsScene
@@ -260,8 +261,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def call_libcamera_raw(self,camera_id,shutter,gain,output_dir,img_idx):
         try:
             # Use timeout to prevent hanging
-            print('before subprocess call')
-
+            print('the Subprocess call is:')
+            print(["/bin/bash", os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'), 'capture_raw', 
+                 str(camera_id), gain, shutter,output_dir,str(img_idx)])
             result = subprocess.run(
                 ["/bin/bash", os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'), 'capture_raw', 
                  str(camera_id), gain, shutter,output_dir,str(img_idx)],
@@ -273,7 +275,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print('result:', result.stdout)
             print(output_dir,camera_id,shutter,gain,img_idx)
             fname = f"{output_dir}/cam{camera_id}_gain{gain}_{shutter}ms_{img_idx}.raw"
-            print("inside call_libcamera_raw():", fname)
+            print("returning call_libcamera_raw():", fname)
+            print(os.path.exists(fname))
             return fname
         except subprocess.TimeoutExpired:
             #self.status_label.setText("Photo capture timed out")
@@ -378,10 +381,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             plt.imshow(raw_chan,cmap='gray')
             if "cam0" in img_filename:
                 plt.savefig(img_filename.replace('.raw','_G.png'))
-                np.save(img_filename.replace('.raw','_G.npy'),raw_chan)
+                tiff.imwrite(img_filename.replace('.raw','_G.tiff'),raw_chan,dtype=np.uint16,compression=None)
+                
+                #np.save(img_filename.replace('.raw','_G.npy'),raw_chan)
             if "cam1" in img_filename:
                 plt.savefig(img_filename.replace('.raw','_B.png'))
-                np.save(img_filename.replace('.raw','_B.npy'),raw_chan)
+                tiff.imwrite(img_filename.replace('.raw','_B.tiff'),raw_chan,dtype=np.uint16,compression=None)
+                #np.save(img_filename.replace('.raw','_B.npy'),raw_chan)
             
             return increase_factor,img_mean
     def call_bash_script(camera_id, shutter, analoggain, output_dir, img_idx=0):
@@ -421,7 +427,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # output_fname = self.call_capture_still(0,shutter0,gain0,output_path,img_idx)
         output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
         print(f'output_fname:{output_fname}')
-        while os.path.exists(os.path.join(output_path,output_fname)) is False:
+        while os.path.exists(output_fname) is False:
             print(f"Waiting for Green image file to be created: {output_fname}")
             time.sleep(1)
         time.sleep(5)  # wait for file to be fully written
@@ -432,7 +438,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), increase_factor1)
             output_fname=self.call_libcamera_raw(0,shutter00,gain00,output_path,img_idx)
-            while os.path.exists(os.path.join(output_path,output_fname)) is False:
+            while os.path.exists(output_fname) is False:
                 print(f"Waiting for UV image file to be created: {output_fname}")
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
@@ -440,7 +446,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), increase_factor2)
             output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
-            while os.path.exists(os.path.join(output_path,output_fname2)) is False:
+            while os.path.exists(output_fname2) is False:
                 print(f"Waiting for UV image file to be created: {output_fname2}")
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
@@ -457,7 +463,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         QApplication.processEvents()  # Update UI
         # take the uv_photo with cam1
         output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
-        while os.path.exists(os.path.join(output_path,output_fname)) is False:
+        while os.path.exists(output_fname) is False:
             print(f"Waiting for UV image file to be created: {output_fname}")
             time.sleep(1)
         time.sleep(5)  # wait for file to be fully written
@@ -468,9 +474,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.shutter1 = shutter1
             self.gain1 = gain1
             shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
+            
             output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
             print("???UV??????????")
-            while os.path.exists(os.path.join(output_path,output_fname2)) is False:
+            print(output_path)
+            print(output_fname2)
+            while os.path.exists(output_fname2) is False:
                 print(f"Waiting for UV image file to be created: {output_fname2}")
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
