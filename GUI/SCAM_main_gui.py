@@ -131,7 +131,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
         self.btn_start_scan.clicked.connect(self.on_start_scan) # point scan
-        self.btn_start_scan.clicked.connect(self.on_start_full_scan) # scenen reconstruct spec scan
+        self.btn_start_full_scan.clicked.connect(self.on_start_full_scan) # scenen reconstruct spec scan
         self.btn_start_scam.clicked.connect(self.on_start_scam)
         self.btn_start_cam.clicked.connect(self.on_start_cam)
     
@@ -527,6 +527,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
         return cam_path
     def on_start_full_scan(self):
+        print("I AM HERE!! FULL SCAN!")
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scan_save_path = os.path.join(FULL_SCAN_PATH, f"SCAN_{start_time}")
         os.makedirs(scan_save_path, exist_ok=True)
