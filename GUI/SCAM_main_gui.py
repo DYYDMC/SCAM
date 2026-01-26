@@ -367,7 +367,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d = cut_raw_black_lines(img_filename)
             
             if 'cam1' in img_filename:
-                raw_chan = extract_B_raw(raw_2d)
+                raw_chan = raw_2d # extract_B_raw(raw_2d)
             if 'cam0' in img_filename:
                 raw_chan = extract_G_raw(raw_2d)
             
