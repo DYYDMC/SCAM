@@ -39,7 +39,8 @@ SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
 ROI_PATH = os.path.join(SCAM_PATH, "roi")
 DATA_PATH = os.path.join(SCAM_PATH, "data")
-SCAN_DATA_PATH = os.path.join(SCAM_PATH, "scan")
+SCAN_DATA_PATH = os.path.join(SCAM_PATH, "scan") # point scan
+FULL_SCAN_PATH = os.path.join(SCAM_PATH, "full_scan")
 EXP_SEARCH_PATH = os.path.join(SCAM_PATH, "exp_search")
 CAM_ROI_PATH = os.path.join(SCAM_PATH, "cam_roi")
 CALI_PATH = os.path.join(SCAM_PATH,"cali")
@@ -129,7 +130,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
-        self.btn_start_scan.clicked.connect(self.on_start_scan)
+        self.btn_start_scan.clicked.connect(self.on_start_scan) # point scan
+        self.btn_start_scan.clicked.connect(self.on_start_full_scan) # scenen reconstruct spec scan
         self.btn_start_scam.clicked.connect(self.on_start_scam)
         self.btn_start_cam.clicked.connect(self.on_start_cam)
     
@@ -333,7 +335,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             cv2.imwrite(output_path, cropped)
             print(f"Saved cropped image: {output_path} (Size: {cropped.shape[1]}x{cropped.shape[0]})")
         return cropped
-
+    def analyze_spectrum(self,intensity,target_max_value=16383):
+        max_intensity = intensity.max()
+        increase_factor = target_max_value / max_intensity
+        print(f'Max intensity: {max_intensity}, Increase factor: {increase_factor}')
+        return increase_factor
     def analyze_image(self,img_filename,target_mean_value=15000):
         if ".jpg" in img_filename:
             # Open the image
@@ -520,6 +526,47 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f"total positions: {len(pan_positions)*len(tilt_positions)}")
         cam_path = [(pp,tt) for tt in tilt_positions for pp in pan_positions]
         return cam_path
+    def on_start_full_scan(self):
+        start_time = time.strftime("%Y%m%d_%H%M%S")
+        scan_save_path = os.path.join(FULL_SCAN_PATH, f"SCAN_{start_time}")
+        os.makedirs(scan_save_path, exist_ok=True)
+        """Start full spectral scan for scene reconstruction"""
+        try:
+            self.on_update_parameters()
+            # hardcode pan/tilt step to 1 degree
+            self.pan_step = 1
+            self.tilt_step = 1
+            cam_path = self.calculate_pano_positions()
+            np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=cam_path)
+            
+            for idx, (pan, tilt) in enumerate(cam_path):
+                print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
+                self.stepper_controller.move_to(pan, tilt)
+                time.sleep(self.isi_oneScan)  # wait for movement
+                tmp_ = self.spec_controller.scan(self.int_oneScan)
+                tmp_ints = tmp_["intensity"]
+                increase_factor = self.analyze_spectrum(tmp_ints) # max/16383
+                while increase_factor>0.95 or increase_factor<0.5:
+                    if increase_factor>.95:
+                        self.int_oneScan = int(self.int_oneScan*0.95)
+                    if increase_factor<0.5:
+                        self.int_oneScan = int(self.int_oneScan*1.15)
+                    time.sleep(1)
+                    print(f'Updated integration time to:{self.int_oneScan} ms')
+                    tmp_ = self.spec_controller.scan(self.int_oneScan)
+                    tmp_ints = tmp_["intensity"]
+                    increase_factor = self.analyze_spectrum(tmp_ints)
+                
+                result_= self.spec_controller.scan(self.int_oneScan)
+                result_['motor_pan'] = pan
+                result_['motor_tilt'] = tilt
+                result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
+                data_filename = os.path.join(scan_save_path, f"sky_scan{tt}")
+                np.save(data_filename,result_)
+                print(f"Waiting for ISI: {self.isi}s before next position...")
+        except Exception as e:
+            print(f"Error during full scan: {str(e)}")
+        
     def on_start_scan(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scan_save_path = os.path.join(SCAN_DATA_PATH, f"SCAN_{start_time}")
