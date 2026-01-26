@@ -46,5 +46,17 @@ def extract_G_raw(sensor_raw,height=3040,width=4056):
     output_g[1::2, 0::2] = G
     output_g[1::2, 1::2] = G
     return output_g
+
+def adjust_shutter_gain(shutter,gain, increase_factor):
+    if float(shutter)*increase_factor<=1000:
+        new_shutter = str(shutter*increase_factor)
+        new_gain = gain
+    elif float(gain)*increase_factor<8:
+        new_gain = str(int(gain*increase_factor*0.8)+1)
+        new_shutter = shutter
+    else:
+        new_shutter="1000"
+        new_gain="8"
+    return new_shutter,new_gain
     
     
