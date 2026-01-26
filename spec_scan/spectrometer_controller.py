@@ -116,7 +116,7 @@ class SpectrometerController:
             }
             
             # Save data
-            self.save_scan_data(wavelengths, intensity, dark_corrected, metadata)
+            # self.save_scan_data(wavelengths, intensity, dark_corrected, metadata)
             
             return {
                 'wavelengths': wavelengths,
