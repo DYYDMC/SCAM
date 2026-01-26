@@ -681,8 +681,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.stepper_controller.move_to(pan, tilt)
             ## wait until the target position is reached
             
-            time.sleep(1)  # wait for movement
-            
             print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_uv_shoot(cam1_data_path,img_idx=idx)
             print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
@@ -692,11 +690,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Waiting for ISI: {self.isi}s before next position...")
             self.cam1_ground_mean = None
             self.cam1_sky_mean = None
-            self.cam0_ground_mean = None
-            self.cam0_sky_mean = None
-            
-            
-            
+              
     def on_start_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(DATA_PATH, f"SCAM_{start_time}")
