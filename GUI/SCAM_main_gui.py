@@ -434,12 +434,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam0_mean0 = img_mean
             increase_factor = max(increase_factor,self.cam1_mean2/self.cam0_mean0)
             if increase_factor>1:
-                if float(shutter0)*increase_factor<=1000:
+                if float(gain0)*increase_factor<8:
+                    gain02 = str(int(self.doubleSpinBox_green_gain.value()*increase_factor*0.8)+1)
+                    output_fname2 = self.call_libcamera_raw(0,shutter0,gain02,output_path,img_idx)
+                elif float(shutter0)*increase_factor<=1000:
                     shutter02=str(self.spinBox_green_shutter.value()*increase_factor)
                     output_fname2 = self.call_libcamera_raw(0,shutter02,gain0,output_path,img_idx)
-                elif float(gain0)*increase_factor<=8:
-                    gain02 = str(self.doubleSpinBox_green_gain.value()*increase_factor)
-                    output_fname2 = self.call_libcamera_raw(0,shutter0,gain02,output_path,img_idx)
                 else:
                     print('lets do the 1000ms and 8gain')
                     shutter02="1000"
@@ -472,10 +472,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(image.shape)
             print(f'for imag:{output_fname2})')
             print(f'max_pixel_value:{image.max()}')
-            increase_factor = 65220/image.max()
-            print(f'increase_factor:{increase_factor}')
+            #increase_factor = 65220/image.max()
+            #print(f'increase_factor:{increase_factor}')
             print(f'mean_pixel_value:{image.mean()}')
-            print(f'image shape:{image.shape}')
             plt.imshow(image,cmap='gray')
             plt.savefig(output_fname2.replace('.raw','.png'))
             np.save(output_fname2.replace('.raw','.npy'),image)
@@ -502,10 +501,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if increase_factor>1:
                 print(f'increase_factor {increase_factor} > 1')
                 if (float(shutter1)*increase_factor)<=1000:
-                    shutter12=str(self.spinBox_uv_shutter.value()*increase_factor)
+                    shutter12=str(int(self.spinBox_uv_shutter.value()*increase_factor))
                     output_fname2 = self.call_libcamera_raw(1,shutter12,gain1,output_path,img_idx)
-                elif float(gain1)*increase_factor<=8:
-                    gain12 = str(self.doubleSpinBox_uv_gain.value()*increase_factor)
+                elif float(gain1)*increase_factor<8:
+                    gain12 = str(int(self.doubleSpinBox_uv_gain.value()*increase_factor)+1)
                     output_fname2 = self.call_libcamera_raw(1,shutter1,gain12,output_path,img_idx)
                 else:
                     print('lets do the 1000ms and 8gain')
@@ -537,10 +536,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(image.shape)
             print(f'for imag:{output_fname2})')
             print(f'max_pixel_value:{image.max()}')
-            increase_factor = 65220/image.max()
-            print(f'increase_factor:{increase_factor}')
+            # increase_factor = 65220/image.max()
+            #print(f'increase_factor:{increase_factor}')
             print(f'mean_pixel_value:{image.mean()}')
-            print(f'image shape:{image.shape}')
             plt.imshow(image,cmap='gray')
             plt.savefig(output_fname2.replace('.raw','.png'))
             np.save(output_fname2.replace('.raw','.npy'),image)
@@ -582,7 +580,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return cam_path
     def on_start_scan(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        scan_save_path = os.path.join(SCAN_DATA_PATH, f"SCAM_{start_time}")
+        scan_save_path = os.path.join(SCAN_DATA_PATH, f"SCAN_{start_time}")
+        os.makedirs(scan_save_path, exist_ok=True)
         """Start solely spectral scan"""
         # scan one visual angle in the sky -> one visual angle in the ground
         try:
@@ -591,35 +590,60 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"ground:{self.pan_oneScan},{self.tilt_min}),sky:({self.pan_oneScan},{self.pan_max})")
             self.ground_int_scan = self.int_oneScan
             self.sky_int_scan = self.int_oneScan
-            for tt in range(2):
+            for tt in range(60*60//5):
                 pan = self.pan_oneScan
-                tilt = self.tilt_min
+                tilt = self.tilt_oneScan
                 self.stepper_controller.move_to(pan, tilt)
-                time.sleep(self.isi_oneScan)  # wait for movement
-                result_ground = self.spec_controller.scan(self.ground_int_scan)
-                while np.max(result_ground['intensity'])/16000<0.5:
-                    self.ground_int_scan = int(self.ground_int_scan*16000/np.max(result_ground['intensity']))
-                    result_ground = self.spec_controller.scan(self.ground_int_scan)
-                result_ground['motor_pan'] = pan
-                result_ground['motor_tilt'] = tilt
-                result_ground['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                data_filename = os.path.join(scan_save_path, f"/ground_scan.pkl")
-                np.save(data_filename,result_ground)
-                print(f'saved to{data_filename}')
+                # time.sleep(self.isi_oneScan)  # wait for movement
+                # result_ground = self.spec_controller.scan(self.ground_int_scan)
+                # while np.max(result_ground['intensity'])/16000<0.5:
+                #     self.ground_int_scan = int(self.ground_int_scan*16000/np.max(result_ground['intensity']))
+                #     print('before update ground int time:',self.ground_int_scan)
+                #     self.ground_int_scan = (self.ground_int_scan//np.power(10,len(str(self.ground_int_scan)))+2)*np.power(10,len(str(self.ground_int_scan)))
+                #     if self.ground_int_scan>6000:
+                #         self.ground_int_scan=1000
+                #         result_ground = self.spec_controller.scan(self.ground_int_scan)
+                #         break
+                #     if self.ground_int_scan<1:
+                #         self.ground_int_scan=2
+                #         result_ground = self.spec_controller.scan(self.ground_int_scan)
+                #         break
+                #     print('updated ground int time:',self.ground_int_scan)
+                #     result_ground = self.spec_controller.scan(self.ground_int_scan)
+                # result_ground['motor_pan'] = pan
+                # result_ground['motor_tilt'] = tilt
+                # result_ground['ts'] = time.strftime("%Y%m%d_%H%M%S")
+                # print(scan_save_path)
+                # data_filename = os.path.join(scan_save_path, f"ground_scan{tt}")
+                # print(data_filename)
+                # np.save(data_filename,result_ground)
+                # print(f'saved to{data_filename}')
                 
-                tilt = self.tilt_max
-                self.stepper_controller.move_to(pan, tilt)
-                time.sleep(self.isi_oneScan)  # wait for movement
-                result_sky = self.spec_controller.scan(self.int_oneScan)
-                while np.max(result_ground['intensity'])/16000<0.5:
-                    self.ground_int_scan = int(self.ground_int_scan*16000/np.max(result_ground['intensity']))
-                    result_ground = self.spec_controller.scan(self.ground_int_scan)
+                # tilt = self.tilt_max
+                # self.stepper_controller.move_to(pan, tilt)
+                # time.sleep(self.isi_oneScan)  # wait for movement
+                # result_sky = self.spec_controller.scan(self.int_oneScan)
+                # print('sky max:',np.max(result_sky['intensity']))
+                # while np.max(result_sky['intensity'])/16000<0.5:
+                #     self.sky_int_scan = int(self.sky_int_scan*16000/np.max(result_sky['intensity']))
+                #     self.sky_int_scan = (self.sky_int_scan//np.power(10,len(str(self.sky_int_scan)))+1)*np.power(10,len(str(self.sky_int_scan)))
+                #     print('updated sky int time:',self.sky_int_scan)
+                #     if self.sky_int_scan>6000:
+                #         self.sky_int_scan=1000
+                #         result_sky = self.spec_controller.scan(self.sky_int_scan)
+                #         break
+                #     if self.sky_int_scan<1:
+                #         self.sky_int_scan=2
+                #         result_sky = self.spec_controller.scan(self.sky_int_scan)
+                #         break
+                #     result_sky = self.spec_controller.scan(self.sky_int_scan)
+                result_sky = self.spec_controller.scan(self.sky_int_scan)
                 result_sky['motor_pan'] = pan
                 result_sky['motor_tilt'] = tilt
                 result_sky['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                data_filename = os.path.join(scan_save_path, f"/sky_scan.pkl")
+                data_filename = os.path.join(scan_save_path, f"sky_scan{tt}")
                 np.save(data_filename,result_sky)
-                print(f'saved to{data_filename}')
+                time.sleep(self.isi_oneScan)
                 
                 # scan
                 
