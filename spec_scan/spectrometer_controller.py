@@ -92,6 +92,7 @@ class SpectrometerController:
         try:
             # Set integration time from ms -> micro-second
             self.spec.integration_time_micros(int_time * 1000)
+            print(f"Integration time set to {int_time} ms")
             
             # Get spectrum
             wavelengths, intensity = self.spec.spectrum()
@@ -106,7 +107,7 @@ class SpectrometerController:
                 print(f"Warning: Could not apply dark correction - {str(e)}")
                 dark_corrected = intensity
                 dark_correction_applied = False
-            
+            print('i m here')
             # Prepare metadata
             metadata = {
                 'integration_time_ms': int_time,
