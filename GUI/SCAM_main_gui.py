@@ -708,21 +708,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         cam0_data_path = os.path.join(scam_data_path, "cam0")
         cam1_data_path = os.path.join(scam_data_path, "cam1")
+        scan_data_path = os.path.join(scam_data_path, "scan_data")
+        
         os.makedirs(cam0_data_path, exist_ok=True)
         os.makedirs(cam1_data_path, exist_ok=True)
-        
-        scan_data_path = os.path.join(scam_data_path, "scan_data")
         os.makedirs(scan_data_path, exist_ok=True)
         
         print(f"Data will be saved to: {scam_data_path}")
-        
-        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
-            self.on_spec_scan()
-        if not hasattr(self, 'num_pan') or not hasattr(self, 'num_tilt'):
-            self.on_update_parameters()
-        self.calculate_pano_positions()
-        print(f"Starting SCAM with Integration Time: {self.int_t}ms, ISI: {self.isi}s")
-        
+        self.on_update_parameters()
         cam_path = self.calculate_pano_positions()
         print(f"Total positions to take CAM photos: {len(cam_path)}")
         
