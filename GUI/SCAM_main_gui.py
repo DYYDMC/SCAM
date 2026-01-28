@@ -133,7 +133,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_update.clicked.connect(self.on_update_parameters)
         self.btn_start_scan.clicked.connect(self.on_start_scan) # point scan
         self.btn_start_full_scan.clicked.connect(self.on_start_full_scan) # scenen reconstruct spec scan
-        self.btn_start_scam.clicked.connect(self.on_start_scam)
+        #self.btn_start_scam.clicked.connect(self.on_start_scam)
+        self.btn_start_scam.clicked.connect(self.on_start_scam_onePos)
         self.btn_start_cam.clicked.connect(self.on_start_cam)
     
     def load_plot(self):
@@ -197,16 +198,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_move_scan(self):
         """Handle move to position and then scans"""
         try:
-            # First move to position
-            pan = self.spinBox_pan_oneScan.value()
-            tilt = self.spinBox_tilt_oneScan.value()
-            print(f"Moving to - Pan: {pan}, Tilt: {tilt}")
             
-            # Use the motor controller
-            self.stepper_controller.move_to(pan, tilt)
+            # read the currenet position
+            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
             
-            # Wait a bit for movement to complete
-            time.sleep(0.2)
+            # extract from GUI for the target position
+            self.next_pan = self.spinBox_pan_oneScan.value()
+            self.next_tilt = self.spinBox_tilt_oneScan.value()
+            print(f"Moving to - Pan: {self.next_pan}, Tilt: {self.next_tilt}")
+            self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+            
+            # calculate the wait
+            delta_t = 0.3*(abs(self.next_tilt-self.current_tilt))+0.1*abs(self.next_pan-self.current_pan)
+            print(f'waiting {delta_t} second')
+            time.sleep(delta_t+1)
+            
+            # reassign the current position
+            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
             
             # Then perform the scan
             self.on_spec_scan()
@@ -555,7 +563,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 increase_factor = self.analyze_spectrum(tmp_ints) # max/16383
                 while increase_factor>0.95 or increase_factor<0.15:
                     if increase_factor>.95:
-                        self.int_oneScan = int(self.int_oneScan*0.95)
+                        self.int_oneScan = int(self.int_oneScan*0.85)
                     if increase_factor<0.15:
                         self.int_oneScan = int(self.int_oneScan*1.15)
                     if self.int_oneScan<2:
@@ -705,8 +713,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam1_sky_mean = None
     
     def on_start_scam_onePos(self):
-        NUM_CAM = 1
-        NUM_SCAN_ITERATION = 1
+        NUM_CAM = 10
+        NUM_SCAN_ITERATION = 10
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"SCAM_{start_time}")
         os.makedirs(scam_data_path, exist_ok=True)
@@ -731,6 +739,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Taking pano (GREEN) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
             self.on_green_shoot(cam0_data_path,img_idx=cc,ground_mode=False)
             for ii in range(NUM_SCAN_ITERATION):
+                self.stepper_controller.move_to(self.pan_oneScan, SPEC_TILT_POS[0])
+                time.sleep((SPEC_TILT_POS[0]-SPEC_TILT_POS[-1])*0.3+1)
                 for ss,tilt in enumerate(SPEC_TILT_POS):
                     # move to position
                     self.stepper_controller.move_to(self.pan_oneScan, tilt)

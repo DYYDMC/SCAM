@@ -88,7 +88,9 @@ class StepperController(SerialBase):
         try:
             response = self.ser.readline().decode().strip()
             print("ESP32-stepper Serial Response:", response)
-            return response
+            pan = int(response.split("|PAN:")[-1].split("|")[0])*-1
+            tilt = int(response.split("|TILT:")[-1])*-1
+            return pan,tilt
         except Exception as e:
             print("Serial read error:", str(e))
             raise
