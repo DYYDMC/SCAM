@@ -450,6 +450,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if '.raw' in output_fname:
             increase_factor1,img_mean = self.analyze_image(output_fname,target_mean_value=self.cam1_mean1)
             os.system('rm '+output_fname.replace('.raw','.*'))
+            os.system('rm '+output_fname.replace('.raw','_G.*'))
             
             shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), increase_factor1)
             output_fname=self.call_libcamera_raw(0,shutter00,gain00,output_path,img_idx)
@@ -527,7 +528,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.tilt_oneScan = self.spinBox_tilt_oneScan.value()
         self.int_oneScan = self.spinBox_int_oneScan.value()
         self.isi_oneScan = self.spinBox_isi_oneScan.value()
-    
+    def motor_wait(self):
+        print(type(self.next_tilt),type(self.current_tilt))
+        delta_t = 0.3*(abs(self.next_tilt-self.current_tilt))+0.1*abs(self.next_pan-self.current_pan)
+        time.sleep(int(delta_t)+1)
     def calculate_pano_positions(self):
         if not hasattr(self,"pan_min") or not hasattr(self,'pan_step'):
             self.on_update_parameters()
@@ -713,8 +717,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam1_sky_mean = None
     
     def on_start_scam_onePos(self):
-        NUM_CAM = 10
-        NUM_SCAN_ITERATION = 10
+        NUM_CAM = 2
+        NUM_SCAN_ITERATION = 1
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"SCAM_{start_time}")
         os.makedirs(scam_data_path, exist_ok=True)
@@ -729,22 +733,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         print(f"Data will be saved to: {scam_data_path}")
         self.on_update_parameters()
-        print(f"Taking SCAM at Pan: {self.pan_oneScan}, Tilt: {self.tilt_oneScan}")
+        self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+        self.next_pan = self.pan_oneScan
+        self.next_tilt = self.tilt_oneScan
+        
+        print(f"Taking CAM at Pan: {self.pan_oneScan}, Tilt: {self.tilt_oneScan}")
         self.stepper_controller.move_to(self.pan_oneScan, self.tilt_oneScan)
-        time.sleep(5)  # wait for movement
+        self.motor_wait()
         for cc in range(NUM_CAM):
+            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+            self.next_pan,self.next_tilt = self.pan_oneScan, self.tilt_oneScan
+            
+            self.stepper_controller.move_to(self.pan_oneScan, self.tilt_oneScan)
+            self.motor_wait()
+            
             self.cam1_mean1 = None
             print(f"Taking pano (UV) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
             self.on_uv_shoot(cam1_data_path,img_idx=cc,ground_mode=False)
             print(f"Taking pano (GREEN) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
             self.on_green_shoot(cam0_data_path,img_idx=cc,ground_mode=False)
             for ii in range(NUM_SCAN_ITERATION):
-                self.stepper_controller.move_to(self.pan_oneScan, SPEC_TILT_POS[0])
-                time.sleep((SPEC_TILT_POS[0]-SPEC_TILT_POS[-1])*0.3+1)
                 for ss,tilt in enumerate(SPEC_TILT_POS):
+                    self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+                    self.next_pan,self.next_tilt = self.pan_oneScan, tilt
+                    
                     # move to position
                     self.stepper_controller.move_to(self.pan_oneScan, tilt)
-                    time.sleep(5)
+                    self.motor_wait()
                     
                     # perform test scan
                     tmp_ = self.spec_controller.scan(self.int_oneScan)
