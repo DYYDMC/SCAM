@@ -39,6 +39,7 @@ SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
 ROI_PATH = os.path.join(SCAM_PATH, "roi")
 DATA_PATH = os.path.join(SCAM_PATH, "data")
+ONE_SCAM_DATA_PATH = os.path.join(DATA_PATH, "one_scam_data")
 SCAN_DATA_PATH = os.path.join(SCAM_PATH, "scan") # point scan
 FULL_SCAN_PATH = os.path.join(SCAM_PATH, "full_scan")
 EXP_SEARCH_PATH = os.path.join(SCAM_PATH, "exp_search")
@@ -419,7 +420,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
-    def on_green_shoot(self,output_path=None,img_idx=0):
+    def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM0
         print('pressed green shoot')
@@ -448,17 +449,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 print(f"Waiting for UV image file to be created: {output_fname}")
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
-            increase_factor2,img_mean = self.analyze_image(output_fname,target_mean_value=self.cam1_mean2)
-            
-            shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), increase_factor2)
-            output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
-            while os.path.exists(output_fname2) is False:
-                print(f"Waiting for UV image file to be created: {output_fname2}")
-                time.sleep(1)
-            time.sleep(5)  # wait for file to be fully written
-            _,_= self.analyze_image(output_fname2)
+            if ground_mode is True:
+                increase_factor2,img_mean = self.analyze_image(output_fname,target_mean_value=self.cam1_mean2)
+                
+                shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), increase_factor2)
+                output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
+                while os.path.exists(output_fname2) is False:
+                    print(f"Waiting for UV image file to be created: {output_fname2}")
+                    time.sleep(1)
+                time.sleep(5)  # wait for file to be fully written
+                _,_= self.analyze_image(output_fname2)
         
-    def on_uv_shoot(self,output_path=None,img_idx=0):
+    def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM1
         print('pressed UV shoot')
@@ -479,19 +481,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam1_mean1 = img_mean
             self.shutter1 = shutter1
             self.gain1 = gain1
-            shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
-            
-            output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
-            print("???UV??????????")
-            print(output_path)
-            print(output_fname2)
-            while os.path.exists(output_fname2) is False:
-                print(f"Waiting for UV image file to be created: {output_fname2}")
-                time.sleep(1)
-            time.sleep(5)  # wait for file to be fully written
-            
-            _,_= self.analyze_image(output_fname2)
-            self.cam1_mean2 = img_mean
+            if ground_mode is True:
+                shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
+                
+                output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
+                print("???UV??????????")
+                print(output_path)
+                print(output_fname2)
+                while os.path.exists(output_fname2) is False:
+                    print(f"Waiting for UV image file to be created: {output_fname2}")
+                    time.sleep(1)
+                time.sleep(5)  # wait for file to be fully written
+                
+                _,_= self.analyze_image(output_fname2)
+                self.cam1_mean2 = img_mean
     def on_both_shoot(self):
         """Handle both cameras shoot"""
         self.on_green_shoot()
@@ -700,7 +703,70 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Waiting for ISI: {self.isi}s before next position...")
             self.cam1_ground_mean = None
             self.cam1_sky_mean = None
-              
+    
+    def on_start_scam_onePos(self):
+        NUM_CAM = 1
+        NUM_SCAN_ITERATION = 1
+        start_time = time.strftime("%Y%m%d_%H%M%S")
+        scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"SCAM_{start_time}")
+        os.makedirs(scam_data_path, exist_ok=True)
+        
+        cam0_data_path = os.path.join(scam_data_path, "cam0")
+        cam1_data_path = os.path.join(scam_data_path, "cam1")
+        scan_data_path = os.path.join(scam_data_path, "scan_data")
+        
+        os.makedirs(cam0_data_path, exist_ok=True)
+        os.makedirs(cam1_data_path, exist_ok=True)
+        os.makedirs(scan_data_path, exist_ok=True)
+        
+        print(f"Data will be saved to: {scam_data_path}")
+        self.on_update_parameters()
+        print(f"Taking SCAM at Pan: {self.pan_oneScan}, Tilt: {self.tilt_oneScan}")
+        self.stepper_controller.move_to(self.pan_oneScan, self.tilt_oneScan)
+        time.sleep(5)  # wait for movement
+        for cc in range(NUM_CAM):
+            self.cam1_mean1 = None
+            print(f"Taking pano (UV) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
+            self.on_uv_shoot(cam1_data_path,img_idx=cc,ground_mode=False)
+            print(f"Taking pano (GREEN) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
+            self.on_green_shoot(cam0_data_path,img_idx=cc,ground_mode=False)
+            for ii in range(NUM_SCAN_ITERATION):
+                for ss,tilt in enumerate(SPEC_TILT_POS):
+                    # move to position
+                    self.stepper_controller.move_to(self.pan_oneScan, tilt)
+                    time.sleep(5)
+                    
+                    # perform test scan
+                    tmp_ = self.spec_controller.scan(self.int_oneScan)
+                    tmp_ints = tmp_["intensity"]
+                    increase_factor = self.analyze_spectrum(tmp_ints) # max/16383
+                    while increase_factor>0.95 or increase_factor<0.15:
+                        if increase_factor>.95:
+                            self.int_oneScan = int(self.int_oneScan*0.95)
+                        if increase_factor<0.15:
+                            self.int_oneScan = int(self.int_oneScan*1.15)
+                        if self.int_oneScan<2:
+                            self.int_oneScan = 2
+                            break
+                        if self.int_oneScan>5999:
+                            self.int_oneScan=5500
+                            break
+                        time.sleep(1)
+                        print(f'Updated integration time to:{self.int_oneScan} ms')
+                        tmp_ = self.spec_controller.scan(self.int_oneScan)
+                        tmp_ints = tmp_["intensity"]
+                        increase_factor = self.analyze_spectrum(tmp_ints)
+                    
+                    # official scan
+                    time.sleep(1)
+                    result_= self.spec_controller.scan(self.int_oneScan)
+                    result_['motor_pan'] = self.pan_oneScan
+                    result_['motor_tilt'] = tilt
+                    result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
+                    data_filename = os.path.join(scan_data_path, f"scan_iter{ii}_pan{self.pan_oneScan}_tilt{tilt}.npy")
+                    np.save(data_filename,result_)
+            
+    
     def on_start_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(DATA_PATH, f"SCAM_{start_time}")
