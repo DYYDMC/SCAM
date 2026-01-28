@@ -550,11 +550,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 tmp_ = self.spec_controller.scan(self.int_oneScan)
                 tmp_ints = tmp_["intensity"]
                 increase_factor = self.analyze_spectrum(tmp_ints) # max/16383
-                while increase_factor>0.95 or increase_factor<0.3:
+                while increase_factor>0.95 or increase_factor<0.15:
                     if increase_factor>.95:
                         self.int_oneScan = int(self.int_oneScan*0.95)
-                    if increase_factor<0.3:
+                    if increase_factor<0.15:
                         self.int_oneScan = int(self.int_oneScan*1.15)
+                    if self.int_oneScan<2:
+                        self.int_oneScan = 2
+                        break
+                    if self.int_oneScan>5999:
+                        self.int_oneScan=5500
+                        break
                     time.sleep(1)
                     print(f'Updated integration time to:{self.int_oneScan} ms')
                     tmp_ = self.spec_controller.scan(self.int_oneScan)
