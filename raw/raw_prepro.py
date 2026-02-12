@@ -39,12 +39,36 @@ def extract_G_raw(sensor_raw,height=3040,width=4056):
     assert H ==height and W==width
     G1 = sensor_raw[0::2, 1::2]
     G2 = sensor_raw[1::2, 0::2]
-    G = ((G1.astype(np.uint16) + G2.astype(np.uint16)) // 2).astype(sensor_raw.dtype)
+
+    # prevent overflow
+    G = ((G1.astype(np.uint32) + G2.astype(np.uint32)) // 2).astype(sensor_raw.dtype)
     output_g = np.empty_like(sensor_raw)
     output_g[0::2, 0::2] = G
     output_g[0::2, 1::2] = G
     output_g[1::2, 0::2] = G
     output_g[1::2, 1::2] = G
+    return output_g
+
+def extract_G1_raw(sensor_raw,height=3040,width=4056):
+    H,W = sensor_raw.shape
+    assert H ==height and W==width
+    G1 = sensor_raw[0::2, 1::2]
+    output_g = np.empty_like(sensor_raw)
+    output_g[0::2, 0::2] = G1
+    output_g[0::2, 1::2] = G1
+    output_g[1::2, 0::2] = G1
+    output_g[1::2, 1::2] = G1
+    return output_g
+
+def extract_G2_raw(sensor_raw,height=3040,width=4056):
+    H,W = sensor_raw.shape
+    assert H ==height and W==width
+    G2 = sensor_raw[1::2, 0::2]
+    output_g = np.empty_like(sensor_raw)
+    output_g[0::2, 0::2] = G2
+    output_g[0::2, 1::2] = G2
+    output_g[1::2, 0::2] = G2
+    output_g[1::2, 1::2] = G2
     return output_g
 
 def adjust_shutter_gain(shutter,gain, increase_factor):
