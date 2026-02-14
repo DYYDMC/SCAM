@@ -33,7 +33,7 @@ from spec_scan.spectrometer_controller import SpectrometerController
 from stepper.OS_end.steppers import StepperController
 from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain
 
-# define paths
+# define paths/home/ydeng/Github/SCAM/matlab_roi_extraction
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
@@ -51,8 +51,8 @@ GUI_PATH = os.path.join(SCAM_PATH, "GUI")
 GUI_CAM0 = os.path.join(GUI_PATH,'cam0')
 GUI_CAM1 = os.path.join(GUI_PATH,'cam1')
 STP_PATH =os.path.join(SCAM_PATH,'stepper')
-CAM0_ROI_NPY = os.path.join(SCAM_PATH, "roi", "cam0","cam0_roi.npy")
-CAM1_ROI_NPY = os.path.join(SCAM_PATH, "roi", "cam1","cam1_roi.npy")
+CAM0_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam0_mask.npy")
+CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 # SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
@@ -380,6 +380,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 return "underexposed"
             else:
                 return "ok"
+    def extract_masked_mean(self,raw_chan,camera):
+        if camera=='cam1':
+            ROI_PATH = CAM1_ROI_NPY
+        if camera=='cam0':
+            ROI_PATH= CAM0_ROI_NPY
+        roi = np.load(ROI_PATH)
+        mean_ = raw_chan[roi==1].mean()
+        return mean_
+    
+    def save_as_jpg(self,input_2d,output_file):
+        plt.imshow(input_2d,cmap='gray')
+        if "cam0" in output_file:
+            plt.savefig(output_file)
     def analyze_image(self,img_filename,target_mean_value=15000):
         
         if ".raw" in img_filename:
@@ -389,11 +402,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             if 'cam1' in img_filename:
                 raw_chan = extract_B_raw(raw_2d) #raw_2d #
+                raw_chan_mean = self.extract_masked_mean(raw_chan,'cam1')
             if 'cam0' in img_filename:
                 raw_chan = extract_G_raw(raw_2d)
+                raw_chan_mean = self.extract_masked_mean(raw_chan,'cam0')
             
-            increase_factor = target_mean_value/raw_chan.mean() # all circular 65220
-            img_mean = raw_chan.mean()
+            increase_factor = target_mean_value/raw_chan_mean # all circular 65220
             print(f'increase_factor:{increase_factor}')
             print(f'mean_pixel_value:{raw_chan.mean()}')
             plt.imshow(raw_chan,cmap='gray')
@@ -407,7 +421,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 #tiff.imwrite(img_filename.replace('.raw','_B.tiff'),raw_chan,dtype=np.uint16,compression=None)
                 #np.save(img_filename.replace('.raw','_B.npy'),raw_chan)
             
-            return increase_factor,img_mean
+            return increase_factor,raw_chan_mean
     def call_bash_script(camera_id, shutter, analoggain, output_dir, img_idx=0):
         os.makedirs(output_dir, exist_ok=True)
         print(f"Calling bash script for camera {camera_id} with shutter {shutter} and gain {analoggain}")
@@ -439,30 +453,39 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Handle green camera shoot"""
         shutter0 = str(self.spinBox_green_shutter.value()) or "33"
         gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
-        print(shutter0,gain0)
+        print(f'taking a test green photo with shutter {shutter0} and gain {gain0}')
         QApplication.processEvents()  # Update UI
-        print(f'the output path is {output_path}')
-        # output_fname = self.call_capture_still(0,shutter0,gain0,output_path,img_idx)
+        
         output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
         print(f'output_fname:{output_fname}')
         while os.path.exists(output_fname) is False:
             print(f"Waiting for Green image file to be created: {output_fname}")
             time.sleep(1)
         time.sleep(5)  # wait for file to be fully written
-        #t0 = time.perf_counter()
+        
+        ## adjust shutter and gain based on the first uv_image and the first green_img
         if '.raw' in output_fname:
-            increase_factor1,img_mean = self.analyze_image(output_fname,target_mean_value=self.cam1_mean1)
-            os.system('rm '+output_fname.replace('.raw','.*'))
-            os.system('rm '+output_fname.replace('.raw','_G.*'))
+            raw_2d = cut_raw_black_lines(output_fname)
+            raw_2d_G = extract_G_raw(raw_2d)
+            self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
+            increase_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
+            self.save_as_jpg(raw_2d_G,output_fname.replace('.raw','_firstAttempt_G.jpg'))
+            #os.remove(output_fname) # remove the yielded raw and json file
             
+            ## generate the new gain shutter
             shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), increase_factor1)
+            # take the first green img
             output_fname=self.call_libcamera_raw(0,shutter00,gain00,output_path,img_idx)
             while os.path.exists(output_fname) is False:
                 print(f"Waiting for UV image file to be created: {output_fname}")
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
+            raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
+            self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
+            self.save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
+            
             if ground_mode is True:
-                increase_factor2,img_mean = self.analyze_image(output_fname,target_mean_value=self.cam1_mean2)
+                increase_factor2=self.cam1_mean2/self.cam0_mean1
                 
                 shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), increase_factor2)
                 output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
@@ -470,7 +493,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     print(f"Waiting for UV image file to be created: {output_fname2}")
                     time.sleep(1)
                 time.sleep(5)  # wait for file to be fully written
-                _,_= self.analyze_image(output_fname2)
+                raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
+                self.save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
+                
         
     def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
@@ -480,37 +505,59 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         shutter1 = str(self.spinBox_uv_shutter.value()) or "33"
         gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
         print(shutter1,gain1)
+        
         QApplication.processEvents()  # Update UI
-        # take the uv_photo with cam1
         output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
         while os.path.exists(output_fname) is False:
             print(f"Waiting for UV image file to be created: {output_fname}")
             time.sleep(1)
         time.sleep(5)  # wait for file to be fully written
-        
-        if '.raw' in output_fname:
-            increase_factor,img_mean= self.analyze_image(output_fname)
-            self.cam1_mean1 = img_mean
-            self.shutter1 = shutter1
-            self.gain1 = gain1
-            if ground_mode is True:
-                shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
-                
-                output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
-                print("???UV??????????")
-                print(output_path)
-                print(output_fname2)
-                while os.path.exists(output_fname2) is False:
-                    print(f"Waiting for UV image file to be created: {output_fname2}")
-                    time.sleep(1)
-                time.sleep(5)  # wait for file to be fully written
-                
-                _,_= self.analyze_image(output_fname2)
-                self.cam1_mean2 = img_mean
+    
+        raw_2d = cut_raw_black_lines(output_fname)
+        raw_2d_B = extract_B_raw(raw_2d)
+        self.cam1_mean1=self.extract_masked_mean(raw_2d_B,'cam1')
+        print(f'initial cam1_mean1: {self.cam1_mean1}:,{4096*1.05/self.cam1_mean1},{45000/self.cam1_mean1}')
+        while self.cam1_mean1<4096*1.05 or self.cam1_mean1>45000:
+            os.rm(output_fname)
+            if self.cam1_mean1<4096*1.05:
+                # underexposed
+                increase_factor = 4096*1.05/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
+            if self.cam1_mean1>45000:
+                # overexposed
+                increase_factor = 45000/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
+           
+            # take a new uv_img1
+            shutter1,gain1 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
+            output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
+            while os.path.exists(output_fname) is False:
+                print(f"Waiting for UV image file to be created: {output_fname}")
+                time.sleep(1)
+            time.sleep(5)
+            raw_2d = cut_raw_black_lines(output_fname)
+            raw_2d_B = extract_B_raw(raw_2d)
+            self.cam1_mean1=self.extract_masked_mean(raw_2d_B,'cam1')
+        self.shutter1 = shutter1;self.gain1 = gain1
+        self.save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
+
+        if ground_mode is True:
+            increase_factor=45000/self.cam1_mean1 # target mean intensity for the masked area is 20000 # need update with horizon detection
+            shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
+            output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
+            print('ground_mode UV_img2')
+            print(output_fname2)
+            while os.path.exists(output_fname2) is False:
+                print(f"Waiting for UV image file to be created: {output_fname2}")
+                time.sleep(1)
+            time.sleep(5)  # wait for file to be fully written
+            raw_2d = cut_raw_black_lines(output_fname2)
+            raw_2d_B = extract_B_raw(raw_2d)
+            self.cam1_mean2=self.extract_masked_mean(raw_2d_B,'cam1')
+            
     def on_both_shoot(self):
         """Handle both cameras shoot"""
-        self.on_green_shoot()
         self.on_uv_shoot()
+        self.on_green_shoot()
+        
     def on_update_parameters(self):
         """"Update parameters from UI"""
         self.pan_min = self.spinBox_pan_min.value()
@@ -680,11 +727,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 
                 time.sleep(1)  # wait for movement
                 
-                print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-                self.on_green_shoot(cam0_data_path,img_idx=idx)
+                
                 # in E5 chessboard calibration
                 print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
                 self.on_uv_shoot(cam1_data_path,img_idx=idx)
+                print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+                self.on_green_shoot(cam0_data_path,img_idx=idx)
                 print(f"Waiting for ISI: {self.isi}s before next position...")
         except Exception as e:
             print(f"Error during SCAN calibration: {str(e)}")
@@ -720,8 +768,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam1_sky_mean = None
     
     def on_start_scam_onePos(self):
-        NUM_CAM = 40
-        NUM_SCAN_ITERATION = 5
+        # print("I AM HERE!! SCAM ONE POSITION!")
+        NUM_CAM = 80
+        NUM_SCAN_ITERATION = 3
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"SCAM_{start_time}")
         os.makedirs(scam_data_path, exist_ok=True)
@@ -823,9 +872,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print('waited 5 seconds after sending MOVE cmds')
             
             print(f"Taking photo scan no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_green_shoot(output_path=cam0_data_path,img_idx=idx)
+            
             self.on_uv_shoot(output_path=cam1_data_path,img_idx=idx)
             print('finished uv photo')
+            self.on_green_shoot(output_path=cam0_data_path,img_idx=idx)
+            
             print("Performing spectral scan...")
             for tilt_scan in SPEC_TILT_POS:
                 self.stepper_controller.move_to(pan,tilt_scan)
