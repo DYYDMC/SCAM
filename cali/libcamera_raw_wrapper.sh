@@ -14,6 +14,7 @@ echo "shutterms4?: $4" # 30 ms
 echo "outputdir5?: $5" # output dir
 echo "imgid6?: $6" # image index
 
+# using configs from the energy folder, flipping applied
 if [[ "$2" == "0" ]]; then
     echo "Using camera 0"
     RAW_CONFIG_PATH="$(dirname "${BASH_SOURCE[0]}")/../energy/green_raw_config.txt"
