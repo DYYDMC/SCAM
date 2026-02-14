@@ -31,7 +31,7 @@ print(project_root)
 from spec_scan.spectrometer_controller import SpectrometerController
 # from rs_motor.rcmotor_controller import MotorController
 from stepper.OS_end.steppers import StepperController
-from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw,extract_R_raw, adjust_shutter_gain
+from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain
 
 # define paths
 HOME = os.path.expanduser("~")
@@ -56,7 +56,8 @@ CAM1_ROI_NPY = os.path.join(SCAM_PATH, "roi", "cam1","cam1_roi.npy")
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 # SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
-SPEC_TILT_POS=[18,13,3,-7,-18]
+# SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
+SPEC_TILT_POS=[13,8,3,-2,-7] # when table is back against the wall(raining)
 MIN_SHUTTER,MAX_SHUTTER,STEP_SHUTTER= int(999), int(1033e3), int(1e4)
 MIN_GAIN,MAX_GAIN,STEP_GAIN = 1.12, 8.0, 0.2
 SHUTTER_SEARCH_RANGE=list(range(MIN_SHUTTER, MAX_SHUTTER, STEP_SHUTTER))
@@ -349,7 +350,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         increase_factor = max_intensity/target_max_value
         print(f'Max intensity: {max_intensity}, Increase factor: {increase_factor}')
         return increase_factor
-    def analyze_image(self,img_filename,target_mean_value=15000):
+    def analyze_image_jpg(self,img_filename,target_mean_value=15000):
         if ".jpg" in img_filename:
             # Open the image
             print(img_filename)
@@ -379,13 +380,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 return "underexposed"
             else:
                 return "ok"
+    def analyze_image(self,img_filename,target_mean_value=15000):
+        
         if ".raw" in img_filename:
             print('processing raw image:',img_filename)
             # read the raw and cute the black lines
             raw_2d = cut_raw_black_lines(img_filename)
             
             if 'cam1' in img_filename:
-                raw_chan = raw_2d # extract_B_raw(raw_2d)
+                raw_chan = extract_B_raw(raw_2d) #raw_2d #
             if 'cam0' in img_filename:
                 raw_chan = extract_G_raw(raw_2d)
             
@@ -396,12 +399,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             plt.imshow(raw_chan,cmap='gray')
             if "cam0" in img_filename:
                 plt.savefig(img_filename.replace('.raw','_G.png'))
-                tiff.imwrite(img_filename.replace('.raw','_G.tiff'),raw_chan,dtype=np.uint16,compression=None)
+                #tiff.imwrite(img_filename.replace('.raw','_G.tiff'),raw_chan,dtype=np.uint16,compression=None)
                 
                 #np.save(img_filename.replace('.raw','_G.npy'),raw_chan)
             if "cam1" in img_filename:
                 plt.savefig(img_filename.replace('.raw','_B.png'))
-                tiff.imwrite(img_filename.replace('.raw','_B.tiff'),raw_chan,dtype=np.uint16,compression=None)
+                #tiff.imwrite(img_filename.replace('.raw','_B.tiff'),raw_chan,dtype=np.uint16,compression=None)
                 #np.save(img_filename.replace('.raw','_B.npy'),raw_chan)
             
             return increase_factor,img_mean
@@ -717,8 +720,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam1_sky_mean = None
     
     def on_start_scam_onePos(self):
-        NUM_CAM = 2
-        NUM_SCAN_ITERATION = 1
+        NUM_CAM = 40
+        NUM_SCAN_ITERATION = 5
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"SCAM_{start_time}")
         os.makedirs(scam_data_path, exist_ok=True)
@@ -788,7 +791,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     result_['motor_pan'] = self.pan_oneScan
                     result_['motor_tilt'] = tilt
                     result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                    data_filename = os.path.join(scan_data_path, f"scan_iter{ii}_pan{self.pan_oneScan}_tilt{tilt}.npy")
+                    data_filename = os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}.npy")
                     np.save(data_filename,result_)
             
     
