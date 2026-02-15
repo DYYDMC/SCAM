@@ -73,12 +73,18 @@ def extract_G2_raw(sensor_raw,height=3040,width=4056):
 
 def adjust_shutter_gain(shutter,gain, increase_factor):
     if float(shutter)*increase_factor<=1000:
+        print('adjust the shutter')
         new_shutter = str(int(shutter*increase_factor))
         new_gain = str(gain)
     elif float(gain)*increase_factor<8:
-        new_gain = str(int(gain*increase_factor*0.8)+1)
+        print('adjust the gain')
+        if gain*increase_factor*0.8<1:
+            new_gain = "2"
+        else:
+            new_gain = str(int(gain*increase_factor*0.8)+1)
         new_shutter = str(int(shutter))
     else:
+        print('cannot adjust the shutter and gain, set to max')
         new_shutter="1000"
         new_gain="8"
     return new_shutter,new_gain
