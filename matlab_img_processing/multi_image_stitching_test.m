@@ -121,13 +121,23 @@ for i = 1:n
         Ii = warpedImages{i}(overlap);
         Ij = warpedImages{j}(overlap);
         
-        mi = mean(Ii);
-        mj = mean(Ij);
+        % % this is a simplified version of Brown&lowe
+        % mi = mean(Ii);
+        % mj = mean(Ij);
+        % A(i,i) = A(i,i) + mi^2;
+        % A(j,j) = A(j,j) + mj^2;
+        % A(i,j) = A(i,j) - mi*mj;
+        % A(j,i) = A(j,i) - mi*mj;
+       
+        Ii = double(Ii);
+        Ij = double(Ij);
         
-        A(i,i) = A(i,i) + mi^2;
-        A(j,j) = A(j,j) + mj^2;
-        A(i,j) = A(i,j) - mi*mj;
-        A(j,i) = A(j,i) - mi*mj;
+        A(i,i) = A(i,i) + sum(Ii.^2);
+        A(j,j) = A(j,j) + sum(Ij.^2);
+        A(i,j) = A(i,j) - sum(Ii .* Ij);
+        A(j,i) = A(j,i) - sum(Ii .* Ij);
+        
+        
     end
 end
 
@@ -179,7 +189,7 @@ panorama = uint16(max(min(panorama,65535),0));
 %% save intermediate panorama
 dir = uigetdir("Title","Please select the folder to save the intermediate result.");
 
-imwrite(panorama, fullfile(dir, sprintf('panorama_scriptGenBlended_uv.tiff')));
+imwrite(panorama, fullfile(dir, sprintf('panorama_scriptGenMultiBandBlended_uv.tiff')));
 %%
 function G = buildGaussianPyramid(img, levels)
 
