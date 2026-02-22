@@ -69,20 +69,19 @@ yMax = max([maxImageSize(1); ylim(:)]);
 %%
 width  = round(xMax - xMin);
 height = round(yMax - yMin);
-
-%%
-panorama = zeros([height width],"like",I);
-
 %%
 xLimits = [xMin xMax];
 yLimits = [yMin yMax];
 panoramaView = imref2d([height width],xLimits,yLimits);
 
 %%
+panorama = zeros([height width],"like",I);
 for idx = 1:numImages
     I = readimage(buildingScene,idx);   
     warpedImage = imwarp(I,tforms(idx),OutputView=panoramaView);                 
     mask = imwarp(true(size(I,1),size(I,2)),tforms(idx),OutputView=panoramaView);
+
+    %imblend is basically doing hard overlay → this causes visible seams.
     panorama = imblend(warpedImage,panorama,mask,foregroundopacity=1);
 end
 
