@@ -368,7 +368,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
                 self.save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
                 
-        
     def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM1
