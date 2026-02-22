@@ -346,53 +346,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             cv2.imwrite(output_path, cropped)
             print(f"Saved cropped image: {output_path} (Size: {cropped.shape[1]}x{cropped.shape[0]})")
         return cropped
-    def analyze_spectrum(self,intensity, max_adc=16383):
-        peak = intensity.max()
-
-        low  = 0.25 * max_adc
-        high = 0.75 * max_adc
-        target = 0.5 * max_adc  # midpoint (stable control)
-
-        if peak == 0:
-            return None  # avoid division by zero
-
-        # If already in acceptable range, keep current time
-        if low <= peak <= high:
-            return 1.0
-
-        # Otherwise compute scaling factor toward midpoint
-        change_factor = target / peak
-        return change_factor
-    def analyze_image_jpg(self,img_filename,target_mean_value=15000):
-        if ".jpg" in img_filename:
-            # Open the image
-            print(img_filename)
-            img = cv2.imread(img_filename)  # Read the image using OpenCV
-            
-            if 'cam0' in img_filename:
-                gray = img[:,:,1] # G 
-            if 'cam1' in img_filename: 
-                gray = img[:,:,1] # Blue
-            print(gray.shape)
-            # crop it according to the CAM_roi
-            cropped = self.apply_roi_to_image(gray,
-                                        CAM0_ROI_NPY if 'cam0' in img_filename else CAM1_ROI_NPY,
-                                        output_path=None)
-            Wc,Hc = cropped.shape
-
-            underexposed_threshold = 50  # Example threshold for underexposure
-            numOverexpPxl = (cropped==255).sum()
-            numUnderexpPxl = (cropped<underexposed_threshold).sum()
-            overExpPercent = 0.01
-            underExpPercent = 0.7
-            if numOverexpPxl>int(Wc*Hc*overExpPercent):
-                print(f'{numOverexpPxl}/({Wc}*{Hc}), {numOverexpPxl/Hc/Wc*100:.2f}% pixels are 255')
-                return "overexposed"
-            elif numUnderexpPxl>int(Wc*Hc*underExpPercent):
-                print(f'{numUnderexpPxl}/({Wc}*{Hc}), {numUnderexpPxl/Hc/Wc*100:.2f}% pixels are below {underexposed_threshold}')
-                return "underexposed"
-            else:
-                return "ok"
     def extract_masked_mean(self,raw_chan,camera):
         if camera=='cam1':
             ROI_PATH = CAM1_ROI_NPY
