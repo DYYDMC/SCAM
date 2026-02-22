@@ -388,29 +388,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 #np.save(img_filename.replace('.raw','_B.npy'),raw_chan)
             
             return increase_factor,raw_chan_mean
-    def call_bash_script(camera_id, shutter, analoggain, output_dir, img_idx=0):
-        os.makedirs(output_dir, exist_ok=True)
-        print(f"Calling bash script for camera {camera_id} with shutter {shutter} and gain {analoggain}")
-        print('cmd:',["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', str(camera_id), shutter, analoggain,output_dir,str(img_idx)])
-        try:
-            # Use timeout to prevent hanging
-            print('before subprocess call')
-            result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', str(camera_id), shutter, analoggain,output_dir,str(img_idx)],
-                check=True,
-                timeout=30,  # 30 second timeout
-                capture_output=True,
-                text=True
-            )
-        except subprocess.TimeoutExpired:
-            #self.status_label.setText("Photo capture timed out")
-            print(f"Photo capture timed out")
-        except subprocess.CalledProcessError as e:
-            #self.status_label.setText("Photo capture failed")
-            print(f"Error: {e.stderr}")
-        except Exception as e:
-            #self.status_label.setText("Unexpected error")
-            print(f"Unexpected error: {e}")
     def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM0
