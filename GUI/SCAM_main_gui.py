@@ -56,8 +56,8 @@ CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 # SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
-# SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
-SPEC_TILT_POS=[13,8,3,-2,-7] # when table is back against the wall(raining)
+SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
+#SPEC_TILT_POS=[13,8,3,-2,-7] # when table is back against the wall(raining)
 MIN_SHUTTER,MAX_SHUTTER,STEP_SHUTTER= int(999), int(1033e3), int(1e4)
 MIN_GAIN,MAX_GAIN,STEP_GAIN = 1.12, 8.0, 0.2
 SHUTTER_SEARCH_RANGE=list(range(MIN_SHUTTER, MAX_SHUTTER, STEP_SHUTTER))
@@ -518,7 +518,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.cam1_mean1=self.extract_masked_mean(raw_2d_B,'cam1')
         print(f'initial cam1_mean1: {self.cam1_mean1}:,{4096*1.05/self.cam1_mean1},{45000/self.cam1_mean1}')
         while self.cam1_mean1<4096*1.05 or self.cam1_mean1>45000:
-            os.rm(output_fname)
+            os.remove(output_fname)
             if self.cam1_mean1<4096*1.05:
                 # underexposed
                 increase_factor = 4096*1.05/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
@@ -619,7 +619,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     if increase_factor>.95:
                         self.int_oneScan = int(self.int_oneScan*0.85)
                     if increase_factor<0.15:
-                        self.int_oneScan = int(self.int_oneScan*1.15)
+                        if int(self.int_oneScan*1.15)<self.int_oneScan:
+                            self.int_oneScan=self.int_oneScan+1
+                        else:
+                            self.int_oneScan = int(self.int_oneScan*1.15)
                     if self.int_oneScan<2:
                         self.int_oneScan = 2
                         break
