@@ -56,8 +56,9 @@ CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 # SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
-SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
+#SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
 #SPEC_TILT_POS=[13,8,3,-2,-7] # when table is back against the wall(raining)
+SPEC_TILT_POS=[]
 MIN_SHUTTER,MAX_SHUTTER,STEP_SHUTTER= int(999), int(1033e3), int(1e4)
 MIN_GAIN,MAX_GAIN,STEP_GAIN = 1.12, 8.0, 0.2
 SHUTTER_SEARCH_RANGE=list(range(MIN_SHUTTER, MAX_SHUTTER, STEP_SHUTTER))
@@ -134,8 +135,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btn_update.clicked.connect(self.on_update_parameters)
         self.btn_start_scan.clicked.connect(self.on_start_scan) # point scan
         self.btn_start_full_scan.clicked.connect(self.on_start_full_scan) # scenen reconstruct spec scan
-        #self.btn_start_scam.clicked.connect(self.on_start_scam)
-        self.btn_start_scam.clicked.connect(self.on_start_scam_onePos)
+        self.btn_start_scam.clicked.connect(self.on_start_scam)
+        #self.btn_start_scam.clicked.connect(self.on_start_scam_onePos)
         self.btn_start_cam.clicked.connect(self.on_start_cam)
     
     def load_plot(self):
@@ -345,11 +346,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             cv2.imwrite(output_path, cropped)
             print(f"Saved cropped image: {output_path} (Size: {cropped.shape[1]}x{cropped.shape[0]})")
         return cropped
-    def analyze_spectrum(self,intensity,target_max_value=16383):
-        max_intensity = intensity.max()
-        increase_factor = max_intensity/target_max_value
-        print(f'Max intensity: {max_intensity}, Increase factor: {increase_factor}')
-        return increase_factor
+    def analyze_spectrum(self,intensity, max_adc=16383):
+        peak = intensity.max()
+
+        low  = 0.25 * max_adc
+        high = 0.75 * max_adc
+        target = 0.5 * max_adc  # midpoint (stable control)
+
+        if peak == 0:
+            return None  # avoid division by zero
+
+        # If already in acceptable range, keep current time
+        if low <= peak <= high:
+            return 1.0
+
+        # Otherwise compute scaling factor toward midpoint
+        change_factor = target / peak
+        return change_factor
     def analyze_image_jpg(self,img_filename,target_mean_value=15000):
         if ".jpg" in img_filename:
             # Open the image
@@ -606,42 +619,41 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # save the scan positions
             np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=cam_path)
             for idx, (pan, tilt) in enumerate(cam_path):
+                ## move motors
+                self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+                self.next_pan = pan
+                self.next_tilt = tilt
+                self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+                self.motor_wait()
                 print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
-                self.stepper_controller.move_to(pan, tilt)
-                time.sleep(self.isi_oneScan)  # wait for movement
-                if idx%len(self.pan_positions)==0:
-                    print(f"At tilt position: {tilt} degrees")
-                    time.sleep(int(0.5*len(self.pan_positions)+1))  # extra wait time for tilt change
-                tmp_ = self.spec_controller.scan(self.int_oneScan)
-                tmp_ints = tmp_["intensity"]
-                increase_factor = self.analyze_spectrum(tmp_ints) # max/16383
-                while increase_factor>0.95 or increase_factor<0.15:
-                    if increase_factor>.95:
-                        self.int_oneScan = int(self.int_oneScan*0.85)
-                    if increase_factor<0.15:
-                        if int(self.int_oneScan*1.15)<self.int_oneScan:
-                            self.int_oneScan=self.int_oneScan+1
-                        else:
-                            self.int_oneScan = int(self.int_oneScan*1.15)
-                    if self.int_oneScan<2:
-                        self.int_oneScan = 2
+                
+                # spectral scan
+                for _ in range(3): # max 3 iteration testing 
+                    measurement = self.spec_controller.scan(self.int_oneScan)
+                    peak = measurement["intensity"].max()
+                    
+                    if .25*16383 <= peak <= .75*16383: # linearity range for the STUV-100
                         break
-                    if self.int_oneScan>5999:
-                        self.int_oneScan=5500
+                    factor = .5*16383 / peak
+
+                    # stability clamp
+                    factor = max(0.5, min(2.0, factor))
+                    new_int = int(self.int_oneScan * factor)
+                    new_int = max(1, min(6000, new_int)) # make sure new_int is between 1ms and 6second
+
+                    if new_int == self.int_oneScan:
                         break
-                    time.sleep(1)
-                    print(f'Updated integration time to:{self.int_oneScan} ms')
-                    tmp_ = self.spec_controller.scan(self.int_oneScan)
-                    tmp_ints = tmp_["intensity"]
-                    increase_factor = self.analyze_spectrum(tmp_ints)
-                time.sleep(1)
-                result_= self.spec_controller.scan(self.int_oneScan)
+                    self.int_oneScan = new_int
+                    
+                print(f'Integration time: {self.int_oneScan} ms')
+
+                result_ = self.spec_controller.scan(self.int_oneScan)
                 result_['motor_pan'] = pan
                 result_['motor_tilt'] = tilt
                 result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                data_filename = os.path.join(scan_save_path, f"full_scan_{idx}")
-                np.save(data_filename,result_)
-                print(f"Waiting for ISI: {self.isi_oneScan}s before next position...")
+
+                np.save(os.path.join(scan_save_path, f"full_scan_{idx}"), result_)
+                time.sleep(self.isi_oneScan)
         except Exception as e:
             print(f"Error during full scan: {str(e)}")
         
@@ -813,38 +825,33 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.next_pan,self.next_tilt = self.pan_oneScan, tilt
                     
                     # move to position
-                    self.stepper_controller.move_to(self.pan_oneScan, tilt)
+                    self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                     self.motor_wait()
                     
-                    # perform test scan
-                    tmp_ = self.spec_controller.scan(self.int_oneScan)
-                    tmp_ints = tmp_["intensity"]
-                    increase_factor = self.analyze_spectrum(tmp_ints) # max/16383
-                    while increase_factor>0.95 or increase_factor<0.15:
-                        if increase_factor>.95:
-                            self.int_oneScan = int(self.int_oneScan*0.95)
-                        if increase_factor<0.15:
-                            self.int_oneScan = int(self.int_oneScan*1.15)
-                        if self.int_oneScan<2:
-                            self.int_oneScan = 2
+                    for _ in range(3): # max 3 iteration testing 
+                        measurement = self.spec_controller.scan(self.int_oneScan)
+                        peak = measurement["intensity"].max()
+                        
+                        if .25*16383 <= peak <= .75*16383: # linearity range for the STUV-100
                             break
-                        if self.int_oneScan>5999:
-                            self.int_oneScan=5500
+                        factor = .5*16383 / peak
+
+                        # stability clamp
+                        factor = max(0.5, min(2.0, factor))
+                        new_int = int(self.int_oneScan * factor)
+                        new_int = max(1, min(6000, new_int)) # make sure new_int is between 1ms and 6second
+
+                        if new_int == self.int_oneScan:
                             break
-                        time.sleep(1)
-                        print(f'Updated integration time to:{self.int_oneScan} ms')
-                        tmp_ = self.spec_controller.scan(self.int_oneScan)
-                        tmp_ints = tmp_["intensity"]
-                        increase_factor = self.analyze_spectrum(tmp_ints)
-                    
-                    # official scan
-                    time.sleep(1)
-                    result_= self.spec_controller.scan(self.int_oneScan)
+                        self.int_oneScan = new_int
+                        
+                    print(f'Integration time: {self.int_oneScan} ms')
+
+                    result_ = self.spec_controller.scan(self.int_oneScan)
                     result_['motor_pan'] = self.pan_oneScan
                     result_['motor_tilt'] = tilt
                     result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                    data_filename = os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}.npy")
-                    np.save(data_filename,result_)
+                    np.save(os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}"), result_)
             
     
     def on_start_scam(self):
@@ -868,36 +875,41 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Iterate over all pan and tilt positions
         for idx, (pan, tilt) in enumerate(cam_path):
             print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
-            self.stepper_controller.move_to(pan, tilt)
-            ## wait until the target position is reached
-            time.sleep(5)  # wait for movement
-            self.stepper_controller.read_pos()
-            print('waited 5 seconds after sending MOVE cmds')
+            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+            self.next_pan = pan
+            self.next_tilt = tilt
+            
+            self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+            self.motor_wait()
             
             print(f"Taking photo scan no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            
-            self.on_uv_shoot(output_path=cam1_data_path,img_idx=idx)
+            self.on_uv_shoot(output_path=cam1_data_path,img_idx=idx,ground_mode=False)
             print('finished uv photo')
-            self.on_green_shoot(output_path=cam0_data_path,img_idx=idx)
-            
-            print("Performing spectral scan...")
-            for tilt_scan in SPEC_TILT_POS:
-                self.stepper_controller.move_to(pan,tilt_scan)
-                # atm don't change the pan
-                time.sleep(2)
-                result = self.on_spec_scan()
-                # print(f'max nm:{max_nm}')
-                if result:
-                    #print("Scan successful, saving data...")
-                    # Save data logic here
-                    data_filename = os.path.join(scan_data_path, f"photo{idx}_scan_pan{pan}_tilt{tilt_scan}.npz")
-                    np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
-                    #print(f"Data saved to {data_filename}")
-                else:
-                    print(f"Scan failed at Pan: {pan}, Tilt: {tilt} - {result['error']}")
-            
-                print(f"Waiting for ISI: {self.isi}s before next position...")
-                time.sleep(self.isi)
+            self.on_green_shoot(output_path=cam0_data_path,img_idx=idx,ground_mode=False)
+            print('finished green photo')
+            if len(SPEC_TILT_POS)>0:
+                print("Performing spectral scan...")
+                for tilt_scan in SPEC_TILT_POS:
+                    self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+                    self.next_pan = pan
+                    self.next_tilt = tilt_scan
+                
+                    self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+                    self.motor_wait()
+
+                    result = self.on_spec_scan()
+                    # print(f'max nm:{max_nm}')
+                    if result:
+                        #print("Scan successful, saving data...")
+                        # Save data logic here
+                        data_filename = os.path.join(scan_data_path, f"photo{idx}_scan_pan{pan}_tilt{tilt_scan}.npz")
+                        np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
+                        #print(f"Data saved to {data_filename}")
+                    else:
+                        print(f"Scan failed at Pan: {pan}, Tilt: {tilt} - {result['error']}")
+                
+                    print(f"Waiting for ISI: {self.isi}s before next position...")
+                    time.sleep(self.isi)
         print("SCAM session completed.")
         self.save_config(os.path.join(scam_data_path, "scam_config.json"))
         
