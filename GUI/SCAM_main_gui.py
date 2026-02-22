@@ -246,31 +246,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self. stepper_controller.close_connection()
         event.accept()
         
-    # Camera functions
-    def load_recent_image(self, camera_id=0):
-        """loads most recent image for camera_id"""
-        # search_dir = CALI_PATH if camera_id == 0 else CAM_ROI_PATH
-        search_dir = GUI_CAM0 if camera_id == 0 else GUI_CAM1
-        pattern = f"*cam{camera_id}*.jpg"
-        
-        try:
-            files = glob.glob(os.path.join(search_dir, pattern))
-            if files:
-                latest = max(files, key=os.path.getmtime)
-                # Use your existing labels - the image will replace the text
-                widget = self.label_green_camera if camera_id == 0 else self.label_uv_camera
-                
-                pixmap = QPixmap(latest).scaled(400, 300, Qt.KeepAspectRatio)
-                widget.setPixmap(pixmap)
-                print(f"Loaded image: {latest} into {widget.objectName()}")
-                return latest
-            else:
-                # Keep the original text if no images found
-                print(f"No images found for camera {camera_id}")
-                return None
-        except Exception as e:
-            print(f"Error loading image for camera {camera_id}: {e}")
-            return None
     def call_libcamera_raw(self,camera_id,shutter,gain,output_dir,img_idx):
         try:
             # Use timeout to prevent hanging
