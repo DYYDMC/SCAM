@@ -74,19 +74,95 @@ xLimits = [xMin xMax];
 yLimits = [yMin yMax];
 panoramaView = imref2d([height width],xLimits,yLimits);
 
-%%
-panorama = zeros([height width],"like",I);
+% %%
+% panorama = zeros([height width],"like",I);
+% for idx = 1:numImages
+%     I = readimage(buildingScene,idx);   
+%     warpedImage = imwarp(I,tforms(idx),OutputView=panoramaView);                 
+%     mask = imwarp(true(size(I,1),size(I,2)),tforms(idx),OutputView=panoramaView);
+% 
+%     %imblend is basically doing hard overlay → this causes visible seams.
+%     panorama = imblend(warpedImage,panorama,mask,foregroundopacity=1);
+% end
+% 
+% imshow(panorama)
+%% Warp all images and store them
+
+warpedImages = cell(numImages,1);
+warpedMasks  = cell(numImages,1);
+
 for idx = 1:numImages
     I = readimage(buildingScene,idx);   
-    warpedImage = imwarp(I,tforms(idx),OutputView=panoramaView);                 
-    mask = imwarp(true(size(I,1),size(I,2)),tforms(idx),OutputView=panoramaView);
-
-    %imblend is basically doing hard overlay → this causes visible seams.
-    panorama = imblend(warpedImage,panorama,mask,foregroundopacity=1);
+    warpedImages{idx} = imwarp(I,tforms(idx),OutputView=panoramaView);
+    warpedMasks{idx}  = imwarp(true(size(I,1),size(I,2)),...
+                               tforms(idx),OutputView=panoramaView);
 end
 
-imshow(panorama)
+%% Convert to double (important for 16-bit)
+for idx = 1:numImages
+    warpedImages{idx} = double(warpedImages{idx});
+end
+     
+%% GAIN COMPENSATION
+
+n = numImages;
+A = zeros(n,n);
+b = zeros(n,1);
+
+for i = 1:n
+    for j = i+1:n
+        
+        overlap = warpedMasks{i} & warpedMasks{j};
+        if nnz(overlap) < 500
+            continue;
+        end
+        
+        Ii = warpedImages{i}(overlap);
+        Ij = warpedImages{j}(overlap);
+        
+        mi = mean(Ii);
+        mj = mean(Ij);
+        
+        A(i,i) = A(i,i) + mi^2;
+        A(j,j) = A(j,j) + mj^2;
+        A(i,j) = A(i,j) - mi*mj;
+        A(j,i) = A(j,i) - mi*mj;
+    end
+end
+
+% Fix first image gain = 1
+A(1,:) = 0;
+A(1,1) = 1;
+b(1) = 1;
+
+gains = A\b;
+
+%% Apply gains
+for idx = 1:n
+    warpedImages{idx} = warpedImages{idx} * gains(idx);
+end
+    
+%% WEIGHTED BLENDING
+
+panorama = zeros(height,width);
+weightSum = zeros(height,width);
+
+for idx = 1:n
+    mask = warpedMasks{idx};
+    
+    % create smooth weight
+    D = bwdist(~mask);
+    D = D ./ max(D(:));   % normalize
+    
+    panorama = panorama + warpedImages{idx} .* D;
+    weightSum = weightSum + D;
+end
+
+panorama = panorama ./ (weightSum + eps);
+
+%% Convert back to 16-bit
+panorama = uint16(max(min(panorama,65535),0));
 %% save intermediate panorama
 dir = uigetdir("Title","Please select the folder to save the intermediate result.");
 
-imwrite(panorama, fullfile(dir, sprintf('panorama_scriptGen_uv.tiff')));
+imwrite(panorama, fullfile(dir, sprintf('panorama_scriptGenBlended_uv.tiff')));
