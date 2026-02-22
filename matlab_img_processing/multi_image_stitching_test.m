@@ -13,6 +13,7 @@ points = detectSURFFeatures(grayImage);
 numImages = numel(buildingScene.Files);
 tforms(numImages) = projtform2d;
 imageSize = zeros(numImages,2);
+imageSize(1,:) = size(grayImage);
 
 %%
 for n = 2:numImages
@@ -141,25 +142,37 @@ gains = A\b;
 for idx = 1:n
     warpedImages{idx} = warpedImages{idx} * gains(idx);
 end
-    
-%% WEIGHTED BLENDING
+   
+%% MULTI-BAND BLENDING
 
-panorama = zeros(height,width);
-weightSum = zeros(height,width);
+levels = 6;% panorama-size dependent, 5-7 works for 16bit img
 
-for idx = 1:n
-    mask = warpedMasks{idx};
-    
-    % create smooth weight
-    % global low-pass blending -> introduce blurs in high-freq details
-    D = bwdist(~mask);
-    D = D ./ max(D(:));   % normalize
-    
-    panorama = panorama + warpedImages{idx} .* D;
-    weightSum = weightSum + D;
+% Build pyramids
+for i = 1:numImages
+    L{i} = buildLaplacianPyramid(warpedImages{i}, levels);
+    W{i} = buildGaussianPyramid(double(warpedMasks{i}), levels);
 end
 
-panorama = panorama ./ (weightSum + eps);
+% Blend each level
+for l = 1:levels
+    num = 0;
+    den = 0;
+    
+    for i = 1:numImages
+        num = num + L{i}{l} .* W{i}{l};
+        den = den + W{i}{l};
+    end
+    
+    blended{l} = num ./ (den + eps);
+end
+
+% Collapse pyramid
+panorama = blended{levels};
+
+for l = levels-1:-1:1
+    panorama = imresize(panorama, size(blended{l}));
+    panorama = panorama + blended{l};
+end
 
 %% Convert back to 16-bit
 panorama = uint16(max(min(panorama,65535),0));
@@ -167,3 +180,27 @@ panorama = uint16(max(min(panorama,65535),0));
 dir = uigetdir("Title","Please select the folder to save the intermediate result.");
 
 imwrite(panorama, fullfile(dir, sprintf('panorama_scriptGenBlended_uv.tiff')));
+%%
+function G = buildGaussianPyramid(img, levels)
+
+G = cell(levels,1);
+G{1} = img;
+
+for l = 2:levels
+    G{l} = imgaussfilt(G{l-1},2);
+    G{l} = imresize(G{l},0.5);
+end
+end
+%%
+function L = buildLaplacianPyramid(img, levels)
+
+G = buildGaussianPyramid(img, levels);
+L = cell(levels,1);
+
+for l = 1:levels-1
+    up = imresize(G{l+1}, size(G{l}));
+    L{l} = G{l} - up;
+end
+
+L{levels} = G{levels};
+end
