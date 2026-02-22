@@ -12,4 +12,5 @@ contrast=1
 saturation=1
 sharpness=1
 autofocus-mode=manual
-camera=0
+camera=1
+vflip=1
