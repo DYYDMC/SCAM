@@ -70,7 +70,6 @@ yMax = max([maxImageSize(1); ylim(:)]);
 %%
 width  = round(xMax - xMin);
 height = round(yMax - yMin);
-%%
 xLimits = [xMin xMax];
 yLimits = [yMin yMax];
 panoramaView = imref2d([height width],xLimits,yLimits);
@@ -92,13 +91,27 @@ panoramaView = imref2d([height width],xLimits,yLimits);
 warpedImages = cell(numImages,1);
 warpedMasks  = cell(numImages,1);
 
+% Here warpedMasks are logical, 0/1 against the assumption of multi-band blending,
+% which is "The masks define a smooth transition region between images."
+% for idx = 1:numImages
+%     I = readimage(buildingScene,idx);   
+%     warpedImages{idx} = imwarp(I,tforms(idx),OutputView=panoramaView);
+%     warpedMasks{idx}  = imwarp(true(size(I,1),size(I,2)),...
+%                                tforms(idx),OutputView=panoramaView);
+% end
+
 for idx = 1:numImages
     I = readimage(buildingScene,idx);   
     warpedImages{idx} = imwarp(I,tforms(idx),OutputView=panoramaView);
-    warpedMasks{idx}  = imwarp(true(size(I,1),size(I,2)),...
-                               tforms(idx),OutputView=panoramaView);
-end
+    mask = imwarp(true(size(I,1),size(I,2)),...
+                  tforms(idx),OutputView=panoramaView);
 
+    % distance from boundary
+    D = bwdist(~mask);
+    D = D ./ max(D(:));   % normalize
+    
+    warpedMasks{idx} = D;
+end
 %% Convert to double (important for 16-bit)
 for idx = 1:numImages
     warpedImages{idx} = double(warpedImages{idx});
@@ -160,7 +173,15 @@ levels = 6;% panorama-size dependent, 5-7 works for 16bit img
 % Build pyramids
 for i = 1:numImages
     L{i} = buildLaplacianPyramid(warpedImages{i}, levels);
-    W{i} = buildGaussianPyramid(double(warpedMasks{i}), levels);
+
+    % no extra smoothing if already make the mask mooth earlier
+    W{i} = buildGaussianPyramid(warpedMasks{i}, levels);
+    % mask = double(warpedMasks{i});
+    % mask = imgaussfilt(mask, 5);   % soften boundary
+    % W{i} = buildGaussianPyramid(mask, levels);
+
+    % % works, but too hard if mask is binary
+    % W{i} = buildGaussianPyramid(double(warpedMasks{i}), levels);
 end
 
 % Blend each level
