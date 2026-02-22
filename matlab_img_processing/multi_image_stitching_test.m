@@ -151,6 +151,7 @@ for idx = 1:n
     mask = warpedMasks{idx};
     
     % create smooth weight
+    % global low-pass blending -> introduce blurs in high-freq details
     D = bwdist(~mask);
     D = D ./ max(D(:));   % normalize
     
