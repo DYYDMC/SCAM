@@ -300,27 +300,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
-    # function to apply ROI
-    def apply_roi_to_image(self,gray, roi_npy_path, output_path=None):
-        nrows, ncols = gray.shape[:2]
-        roi = np.load(roi_npy_path)
-        x_start_norm, y_start_norm, width_norm, height_norm = roi
-        
-        # Convert normalized coordinates to pixel coordinates
-        x_start,y_start= int(x_start_norm * ncols),int(y_start_norm * nrows)
-        width,height = int(width_norm * ncols),int(height_norm * nrows)
-        
-        # Ensure coordinates are within bounds
-        x_start,y_start = max(0, min(x_start, ncols-1)),max(0, min(y_start, nrows-1))
-        width,height= max(1, min(width, ncols - x_start)),max(1, min(height, nrows - y_start))
-        
-        # Crop the image
-        cropped = gray[y_start:y_start+height, x_start:x_start+width]
-        
-        if output_path:
-            cv2.imwrite(output_path, cropped)
-            print(f"Saved cropped image: {output_path} (Size: {cropped.shape[1]}x{cropped.shape[0]})")
-        return cropped
     def extract_masked_mean(self,raw_chan,camera):
         if camera=='cam1':
             ROI_PATH = CAM1_ROI_NPY
