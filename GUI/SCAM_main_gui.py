@@ -300,31 +300,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
-    def call_capture_still(self,camera_id,shutter,gain,output_dir,img_idx):
-        try:
-            # Use timeout to prevent hanging
-            print('before subprocess call')
-            result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', 
-                 str(camera_id), shutter, gain,output_dir,str(img_idx)],
-                check=True,
-                timeout=30,  # 30 second timeout
-                capture_output=True,
-                text=True
-            )
-            fname = f"{output_dir}/cam{camera_id}_{img_idx}.jpg"
-            print(fname)
-            return fname
-        except subprocess.TimeoutExpired:
-            #self.status_label.setText("Photo capture timed out")
-            print(f"Photo capture timed out")
-        except subprocess.CalledProcessError as e:
-            #self.status_label.setText("Photo capture failed")
-            print(f"Error: {e.stderr}")
-        except Exception as e:
-            #self.status_label.setText("Unexpected error")
-            print(f"Unexpected error: {e}")
-        
     # function to apply ROI
     def apply_roi_to_image(self,gray, roi_npy_path, output_path=None):
         nrows, ncols = gray.shape[:2]
