@@ -20,19 +20,15 @@ end
 
 % Reorder datastore (replace Files)
 imds.Files = files(order);
-%%
-disp(imds.Files);
-numFiles = numel(imds.Files);
-%% Load mask
-% this was the circular mask
-% cam1_mask=load("cam1_mask_uv_specific.mat").cam1_mask;
 
-% this applies the square mask
-%cam_mask=load("cam1_square_mask_uv_specific.mat").cam1_square_mask;
-cam_mask=load("cam0_square_mask_green_specific.mat").cam0_square_mask;
-cam_mask =fliplr(cam_mask);
-%cam1_mask=fliplr(cam1_mask); % due to roi 
-%cam1_mask=flipud(cam1_mask);
+%% Load mask
+
+% green cam situation 
+% cam_mask=load("cam0_mask.mat").square_mask;
+% cam_mask =fliplr(cam_mask);
+
+% uv cam situation
+cam_mask=load("cam1_mask.mat").square_mask;
 %%
 ii = 0;
 numFiles = numel(imds.Files);
@@ -49,5 +45,5 @@ for k = 1:numFiles
     cropped_ = img_maskedd_flipped_adjusted(bb(2):(bb(2)+bb(4)-1), ...
                                             bb(1):(bb(1)+bb(3)-1), :);
 
-    imwrite(cropped_, fullfile(dir, sprintf('preproed_cropped_green_%d.tiff', ii)));
+    imwrite(cropped_, fullfile(dir, sprintf('preproed_cropped_uv_%d.tiff', ii)));
 end
