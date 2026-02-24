@@ -485,7 +485,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>CAM</string>
+      <string>PANO</string>
      </property>
     </widget>
     <widget class="QPushButton" name="btn_start_scan">
@@ -498,7 +498,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>pointSCAN</string>
+      <string>point SCAM</string>
      </property>
     </widget>
     <widget class="QWidget" name="verticalLayoutWidget">
@@ -696,7 +696,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>FULL SCAN</string>
+      <string>full SCAN</string>
      </property>
     </widget>
    </widget>
