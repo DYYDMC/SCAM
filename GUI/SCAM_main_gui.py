@@ -312,12 +312,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d_G = extract_G_raw(raw_2d)
             self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
             increase_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
-            self.save_as_jpg(raw_2d_G,output_fname.replace('.raw','_firstAttempt_G.jpg'))
+            
+            ## remove the first test-run green .raw and .json
+            os.remove(output_fname) # remove the yielded raw and json file
+            os.remove(output_fname.replace('.raw','.json'))
+            
+            # self.save_as_jpg(raw_2d_G,output_fname.replace('.raw','_firstAttempt_G.jpg'))
             #os.remove(output_fname) # remove the yielded raw and json file
             
             ## generate the new gain shutter
             shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), increase_factor1)
-            # take the first green img
+            # take the official first green img
             output_fname=self.call_libcamera_raw(0,shutter00,gain00,output_path,img_idx)
             while os.path.exists(output_fname) is False:
                 print(f"Waiting for UV image file to be created: {output_fname}")
