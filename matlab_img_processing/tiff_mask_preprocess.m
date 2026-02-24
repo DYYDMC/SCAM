@@ -24,11 +24,11 @@ imds.Files = files(order);
 %% Load mask
 
 % green cam situation 
-% cam_mask=load("cam0_mask.mat").square_mask;
-% cam_mask =fliplr(cam_mask);
+cam_mask=load("cam0_mask.mat").square_mask;
+cam_mask =fliplr(cam_mask);
 
 % uv cam situation
-cam_mask=load("cam1_mask.mat").square_mask;
+%cam_mask=load("cam1_mask.mat").square_mask;
 %%
 ii = 0;
 numFiles = numel(imds.Files);
@@ -38,12 +38,12 @@ for k = 1:numFiles
     img = fliplr(img);
     img_masked = img;
     img_masked(~cam_mask) = 0;
-    img_maskedd_flipped_adjusted = imadjust(img_masked, [], [], 0.5);
+    img_maskedd_flipped_adjusted = imadjust(img_masked, [], [], 0.1);
 
     props = regionprops(cam_mask, 'BoundingBox');
     bb = ceil(props(1).BoundingBox);   % use props(1) if multiple regions
     cropped_ = img_maskedd_flipped_adjusted(bb(2):(bb(2)+bb(4)-1), ...
                                             bb(1):(bb(1)+bb(3)-1), :);
 
-    imwrite(cropped_, fullfile(dir, sprintf('preproed_cropped_uv_%d.tiff', ii)));
+    imwrite(cropped_, fullfile(dir, sprintf('preproed_cropped_green_%d.tiff', ii)));
 end
