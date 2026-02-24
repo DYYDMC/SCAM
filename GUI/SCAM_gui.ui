@@ -307,7 +307,7 @@
       <item row="3" column="1">
        <widget class="QDoubleSpinBox" name="doubleSpinBox_uv_gain">
         <property name="minimum">
-         <double>1.120000000000000</double>
+         <double>8.000000000000000</double>
         </property>
         <property name="maximum">
          <double>8.000000000000000</double>
@@ -316,7 +316,7 @@
          <double>0.500000000000000</double>
         </property>
         <property name="value">
-         <double>1.120000000000000</double>
+         <double>8.000000000000000</double>
         </property>
        </widget>
       </item>
