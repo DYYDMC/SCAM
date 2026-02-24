@@ -313,11 +313,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         time.sleep(5)  # wait for file to be fully written
         
         ## adjust shutter and gain based on the first uv_image and the first green_img
-        if '.raw' in output_fname:
-            raw_2d = cut_raw_black_lines(output_fname)
-            raw_2d_G = extract_G_raw(raw_2d)
-            self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
-            increase_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
+        raw_2d = cut_raw_black_lines(output_fname)
+        raw_2d_G = extract_G_raw(raw_2d)
+        self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
+        change_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
+        
+        if change_factor1<.95 or change_factor1>1.05:
+            ## need adjustment
+            shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), change_factor1)
+            ## store the first green img's shutter and gain for the later use in the ground mode
+            self.cam0_shutter00 = shutter00; self.cam0_gain00 = gain00
             
             ## remove the first test-run green .raw and .json
             os.remove(output_fname) # remove the yielded raw and json file
