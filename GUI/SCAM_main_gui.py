@@ -358,6 +358,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_B = extract_B_raw(raw_2d)
         self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
+        save_as_jpg(raw_2d_B,output_fname.replace('.raw','_preview_B.jpg'))
+        
         print(f'initial cam1_mean1: {self.cam1_mean1}:,{4096*1.05/self.cam1_mean1},{45000/self.cam1_mean1}')
         while self.cam1_mean1<4096*1.05 or self.cam1_mean1>45000:
             os.remove(output_fname)
