@@ -133,11 +133,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
-        self.btn_start_scan.clicked.connect(self.on_start_scan) # point scan
-        self.btn_start_full_scan.clicked.connect(self.on_start_full_scan) # scenen reconstruct spec scan
-        self.btn_start_scam.clicked.connect(self.on_start_scam)
-        #self.btn_start_scam.clicked.connect(self.on_start_scam_onePos)
-        self.btn_start_cam.clicked.connect(self.on_start_cam)
+        self.btn_start_point_scan.clicked.connect(self.on_start_point_scan)# point scan
+        self.btn_start_full_scan.clicked.connect(self.on_start_full_scan) 
+        self.btn_start_pano.clicked.connect(self.on_start_pano) # only camera-based pano scan
+        self.btn_start_point_scam.clicked.connect(self.on_start_point_scam)
+        self.btn_start_full_scam.clicked.connect(self.on_start_full_scam)
     
     def load_plot(self):
         """Simple load_plot function similar to your original"""
@@ -484,7 +484,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Error during full scan: {str(e)}")
         
-    def on_start_scan(self):
+    def on_start_point_scan(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scan_save_path = os.path.join(SCAN_DATA_PATH, f"SCAN_{start_time}")
         os.makedirs(scan_save_path, exist_ok=True)
@@ -556,7 +556,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Error during SCAN calibration: {str(e)}")
         
-    def on_start_cam(self):
+    def on_start_pano(self):
         if not hasattr(self,"num_pan") or not hasattr(self,'num_tilt'):
             self.on_update_parameters()
         if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
@@ -586,7 +586,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam1_ground_mean = None
             self.cam1_sky_mean = None
     
-    def on_start_scam_onePos(self):
+    def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
         NUM_CAM = 80
         NUM_SCAN_ITERATION = 3
@@ -658,7 +658,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     np.save(os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}"), result_)
             
     
-    def on_start_scam(self):
+    def on_start_full_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(DATA_PATH, f"SCAM_{start_time}")
         os.makedirs(scam_data_path, exist_ok=True)
