@@ -31,7 +31,7 @@ print(project_root)
 from spec_scan.spectrometer_controller import SpectrometerController
 # from rs_motor.rcmotor_controller import MotorController
 from stepper.OS_end.steppers import StepperController
-from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain
+from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain, save_as_jpg
 
 # define paths/home/ydeng/Github/SCAM/matlab_roi_extraction
 HOME = os.path.expanduser("~")
@@ -283,11 +283,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         roi = np.load(ROI_PATH)
         mean_ = raw_chan[roi==1].mean()
         return mean_
-    
-    def save_as_jpg(self,input_2d,output_file):
-        plt.imshow(input_2d,cmap='gray')
-        if "cam0" in output_file:
-            plt.savefig(output_file)
     def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM0
@@ -337,7 +332,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(5)  # wait for file to be fully written
             raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
             self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
-            self.save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
+            save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
         
         ## if ground_mode is True, take the second green image with the shutter and gain adjusted based on the second uv image
         if ground_mode is True:
@@ -350,7 +345,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
             raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
-            self.save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
+            save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
                 
     def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
@@ -392,7 +387,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d_B = extract_B_raw(raw_2d)
             self.cam1_mean1=self.extract_masked_mean(raw_2d_B,'cam1')
         self.shutter1 = shutter1;self.gain1 = gain1
-        self.save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
+        save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
 
         if ground_mode is True:
             change_factor=45000/self.cam1_mean1 # target mean intensity for the masked area is 20000 # need update with horizon detection

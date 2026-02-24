@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 def cut_raw_black_lines(img_filename,stride=8128,height=3040,width=4056):
     ## parse the bytes
     ## take the H,W part only (the rest columns are black for ?
@@ -70,7 +71,10 @@ def extract_G2_raw(sensor_raw,height=3040,width=4056):
     output_g[1::2, 0::2] = G2
     output_g[1::2, 1::2] = G2
     return output_g
-
+def save_as_jpg(input_2d,output_file):
+        plt.imshow(input_2d,cmap='gray')
+        if "cam0" in output_file:
+            plt.savefig(output_file)
 def adjust_shutter_gain(shutter,gain, change_factor):
     min_shutter, max_shutter = 1.0, 1000.0
     min_gain, max_gain = 1.12, 8.0
