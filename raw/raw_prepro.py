@@ -72,21 +72,43 @@ def extract_G2_raw(sensor_raw,height=3040,width=4056):
     return output_g
 
 def adjust_shutter_gain(shutter,gain, increase_factor):
-    if float(shutter)*increase_factor<=1000:
+    min_shutter, max_shutter = 1.0, 1000.0
+    min_gain, max_gain = 1.12, 8.0
+
+    shutter = float(shutter)
+    gain = float(gain)
+    factor = float(increase_factor)
+
+    if not np.isfinite(factor) or factor <= 0:
+        factor = 1.0
+
+    target_shutter = shutter * factor
+    if min_shutter <= target_shutter <= max_shutter:
         print('adjust the shutter')
-        new_shutter = str(int(shutter*increase_factor))
-        new_gain = str(gain)
-    elif float(gain)*increase_factor<8:
-        print('adjust the gain')
-        if gain*increase_factor*0.8<1:
-            new_gain = "2"
-        else:
-            new_gain = str(int(gain*increase_factor*0.8)+1)
-        new_shutter = str(int(shutter))
+        new_shutter = target_shutter
+        new_gain = gain
     else:
-        print('cannot adjust the shutter and gain, set to max')
-        new_shutter="1000"
-        new_gain="8"
-    return new_shutter,new_gain
+        # Saturate shutter first, then apply residual factor on gain.
+        if target_shutter > max_shutter:
+            new_shutter = max_shutter
+        else:
+            new_shutter = min_shutter
+
+        if shutter > 0:
+            residual_factor = factor / (new_shutter / shutter)
+        else:
+            residual_factor = factor
+
+        target_gain = gain * residual_factor
+        new_gain = min(max(target_gain, min_gain), max_gain)
+
+        if new_gain != gain:
+            print('adjust the gain')
+        else:
+            print('cannot adjust further (at limits)')
+
+    new_shutter = str(int(round(new_shutter)))
+    new_gain = f"{new_gain:.2f}".rstrip("0").rstrip(".")
+    return new_shutter, new_gain
     
     
