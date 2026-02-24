@@ -288,35 +288,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         plt.imshow(input_2d,cmap='gray')
         if "cam0" in output_file:
             plt.savefig(output_file)
-    def analyze_image(self,img_filename,target_mean_value=15000):
-        
-        if ".raw" in img_filename:
-            print('processing raw image:',img_filename)
-            # read the raw and cute the black lines
-            raw_2d = cut_raw_black_lines(img_filename)
-            
-            if 'cam1' in img_filename:
-                raw_chan = extract_B_raw(raw_2d) #raw_2d #
-                raw_chan_mean = self.extract_masked_mean(raw_chan,'cam1')
-            if 'cam0' in img_filename:
-                raw_chan = extract_G_raw(raw_2d)
-                raw_chan_mean = self.extract_masked_mean(raw_chan,'cam0')
-            
-            increase_factor = target_mean_value/raw_chan_mean # all circular 65220
-            print(f'increase_factor:{increase_factor}')
-            print(f'mean_pixel_value:{raw_chan.mean()}')
-            plt.imshow(raw_chan,cmap='gray')
-            if "cam0" in img_filename:
-                plt.savefig(img_filename.replace('.raw','_G.png'))
-                #tiff.imwrite(img_filename.replace('.raw','_G.tiff'),raw_chan,dtype=np.uint16,compression=None)
-                
-                #np.save(img_filename.replace('.raw','_G.npy'),raw_chan)
-            if "cam1" in img_filename:
-                plt.savefig(img_filename.replace('.raw','_B.png'))
-                #tiff.imwrite(img_filename.replace('.raw','_B.tiff'),raw_chan,dtype=np.uint16,compression=None)
-                #np.save(img_filename.replace('.raw','_B.npy'),raw_chan)
-            
-            return increase_factor,raw_chan_mean
     def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM0
