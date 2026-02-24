@@ -71,13 +71,13 @@ def extract_G2_raw(sensor_raw,height=3040,width=4056):
     output_g[1::2, 1::2] = G2
     return output_g
 
-def adjust_shutter_gain(shutter,gain, increase_factor):
+def adjust_shutter_gain(shutter,gain, change_factor):
     min_shutter, max_shutter = 1.0, 1000.0
     min_gain, max_gain = 1.12, 8.0
 
     shutter = float(shutter)
     gain = float(gain)
-    factor = float(increase_factor)
+    factor = float(change_factor)
 
     if not np.isfinite(factor) or factor <= 0:
         factor = 1.0
