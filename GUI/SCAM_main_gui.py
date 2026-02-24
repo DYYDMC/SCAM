@@ -691,6 +691,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print('finished uv photo')
             self.on_green_shoot(output_path=cam0_data_path,img_idx=idx,ground_mode=False)
             print('finished green photo')
+            
+            ## if SPEC_TILT_POS is defined, perform spectral scan at different tilt positions for the same pan position
             if len(SPEC_TILT_POS)>0:
                 print("Performing spectral scan...")
                 for tilt_scan in SPEC_TILT_POS:
@@ -714,7 +716,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 
                     print(f"Waiting for ISI: {self.isi}s before next position...")
                     time.sleep(self.isi)
-        print("SCAM session completed.")
+        print("the full SCAM session completed.")
         self.save_config(os.path.join(scam_data_path, "scam_config.json"))
         
 if __name__ == '__main__':
