@@ -291,14 +291,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM0
-        print('pressed green shoot')
-        print(output_path)
-        """Handle green camera shoot"""
-        shutter0 = str(self.spinBox_green_shutter.value()) or "33"
-        gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
-        print(f'taking a test green photo with shutter {shutter0} and gain {gain0}')
+        
+        ## if this is the first green shoot
+        if self.cam0_shutter00 is None and self.cam0_gain00 is None:
+            # for the first green shoot, use the default shutter and gain from the UI
+            shutter0 = str(self.spinBox_green_shutter.value()) or "33"
+            gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
+        else:
+            # for the later green shoots, use the adjusted shutter and gain based on the first green shoot
+            shutter0 = self.cam0_shutter00
+            gain0 = self.cam0_gain00
+        print(f'taking a green photo with shutter {shutter0} and gain {gain0}')
         QApplication.processEvents()  # Update UI
         
+        ## take the first green image with the default or adjusted shutter and gain
         output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
         print(f'output_fname:{output_fname}')
         while os.path.exists(output_fname) is False:
@@ -317,12 +323,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             os.remove(output_fname) # remove the yielded raw and json file
             os.remove(output_fname.replace('.raw','.json'))
             
-            # self.save_as_jpg(raw_2d_G,output_fname.replace('.raw','_firstAttempt_G.jpg'))
-            #os.remove(output_fname) # remove the yielded raw and json file
-            
-            ## generate the new gain shutter
-            shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), increase_factor1)
-            # take the official first green img
+            # take a new green image with the adjusted shutter and gain
             output_fname=self.call_libcamera_raw(0,shutter00,gain00,output_path,img_idx)
             while os.path.exists(output_fname) is False:
                 print(f"Waiting for UV image file to be created: {output_fname}")
