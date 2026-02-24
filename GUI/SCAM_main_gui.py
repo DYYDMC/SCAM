@@ -31,7 +31,7 @@ print(project_root)
 from spec_scan.spectrometer_controller import SpectrometerController
 # from rs_motor.rcmotor_controller import MotorController
 from stepper.OS_end.steppers import StepperController
-from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain, save_as_jpg
+from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain, save_as_jpg, extract_masked_mean
 
 # define paths/home/ydeng/Github/SCAM/matlab_roi_extraction
 HOME = os.path.expanduser("~")
@@ -275,14 +275,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
-    def extract_masked_mean(self,raw_chan,camera):
-        if camera=='cam1':
-            ROI_PATH = CAM1_ROI_NPY
-        if camera=='cam0':
-            ROI_PATH= CAM0_ROI_NPY
-        roi = np.load(ROI_PATH)
-        mean_ = raw_chan[roi==1].mean()
-        return mean_
     def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
             output_path = GUI_CAM0
@@ -311,7 +303,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ## adjust shutter and gain based on the first uv_image and the first green_img
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_G = extract_G_raw(raw_2d)
-        self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
+        self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
         change_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
         
         if change_factor1<.95 or change_factor1>1.05:
@@ -331,7 +323,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 time.sleep(1)
             time.sleep(5)  # wait for file to be fully written
             raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
-            self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
+            self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
             save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
         
         ## if ground_mode is True, take the second green image with the shutter and gain adjusted based on the second uv image
@@ -365,7 +357,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_B = extract_B_raw(raw_2d)
-        self.cam1_mean1=self.extract_masked_mean(raw_2d_B,'cam1')
+        self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
         print(f'initial cam1_mean1: {self.cam1_mean1}:,{4096*1.05/self.cam1_mean1},{45000/self.cam1_mean1}')
         while self.cam1_mean1<4096*1.05 or self.cam1_mean1>45000:
             os.remove(output_fname)
@@ -385,7 +377,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(5)
             raw_2d = cut_raw_black_lines(output_fname)
             raw_2d_B = extract_B_raw(raw_2d)
-            self.cam1_mean1=self.extract_masked_mean(raw_2d_B,'cam1')
+            self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
         self.shutter1 = shutter1;self.gain1 = gain1
         save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
 
@@ -401,7 +393,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(5)  # wait for file to be fully written
             raw_2d = cut_raw_black_lines(output_fname2)
             raw_2d_B = extract_B_raw(raw_2d)
-            self.cam1_mean2=self.extract_masked_mean(raw_2d_B,'cam1')
+            self.cam1_mean2=extract_masked_mean(raw_2d_B,'cam1')
             
     def on_both_shoot(self):
         """Handle both cameras shoot"""
@@ -414,7 +406,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pan_max = self.spinBox_pan_max.value()
         self.pan_step = self.spinBox_pan_stepsize.value()
         self.num_pan = int((self.pan_max - self.pan_min)/self.pan_step) + 1
-        self.label_pan_toUpdatenumStep.setText(str(self.num_pan)) 
         
         self.tilt_min = self.spinBox_tilt_min.value()
         self.tilt_max = self.spinBox_tilt_max.value()
@@ -429,7 +420,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.int_oneScan = self.spinBox_int_oneScan.value()
         self.isi_oneScan = self.spinBox_isi_oneScan.value()
     def motor_wait(self):
-        print(type(self.next_tilt),type(self.current_tilt))
         delta_t = 0.3*(abs(self.next_tilt-self.current_tilt))+0.1*abs(self.next_pan-self.current_pan)
         time.sleep(int(delta_t)+1)
     def calculate_pano_positions(self):

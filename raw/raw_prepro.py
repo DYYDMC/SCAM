@@ -1,5 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+
+HOME = os.path.expanduser("~")
+SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+CAM0_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam0_mask.npy")
+CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 def cut_raw_black_lines(img_filename,stride=8128,height=3040,width=4056):
     ## parse the bytes
     ## take the H,W part only (the rest columns are black for ?
@@ -71,6 +77,15 @@ def extract_G2_raw(sensor_raw,height=3040,width=4056):
     output_g[1::2, 0::2] = G2
     output_g[1::2, 1::2] = G2
     return output_g
+def extract_masked_mean(raw_chan,camera):
+    if camera=='cam1':
+        ROI_PATH = CAM1_ROI_NPY
+    if camera=='cam0':
+        ROI_PATH= CAM0_ROI_NPY
+    roi = np.load(ROI_PATH)
+    mean_ = raw_chan[roi==1].mean()
+    return mean_
+    
 def save_as_jpg(input_2d,output_file):
         plt.imshow(input_2d,cmap='gray')
         if "cam0" in output_file:
