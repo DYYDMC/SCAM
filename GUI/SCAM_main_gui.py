@@ -555,29 +555,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 
         except Exception as e:
             print(f"Error during SCAN calibration: {str(e)}")
-    def on_start_scan_cali(self):
-        """Start calibration scan sequence"""
-        try:
-            self.on_update_parameters()
-            print(f"Starting SCAN calibration...")
-            cam_path = self.calculate_pano_positions()
-            print(f"Total positions to take CAM photos: {len(cam_path)}")
-            for idx, (pan, tilt) in enumerate(cam_path):
-                print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
-                self.stepper_controller.move_to(pan, tilt)
-                ## wait until the target position is reached
-                
-                time.sleep(1)  # wait for movement
-                
-                
-                # in E5 chessboard calibration
-                print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-                self.on_uv_shoot(cam1_data_path,img_idx=idx)
-                print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
-                self.on_green_shoot(cam0_data_path,img_idx=idx)
-                print(f"Waiting for ISI: {self.isi}s before next position...")
-        except Exception as e:
-            print(f"Error during SCAN calibration: {str(e)}")
         
     def on_start_cam(self):
         if not hasattr(self,"num_pan") or not hasattr(self,'num_tilt'):
