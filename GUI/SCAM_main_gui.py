@@ -310,7 +310,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         while os.path.exists(output_fname) is False:
             print(f"Waiting for Green image file to be created: {output_fname}")
             time.sleep(1)
-        time.sleep(5)  # wait for file to be fully written
+        # wait for file to be fully written
+        time.sleep(5)  
         
         ## adjust shutter and gain based on the first uv_image and the first green_img
         raw_2d = cut_raw_black_lines(output_fname)
@@ -325,7 +326,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cam0_shutter00 = shutter00; self.cam0_gain00 = gain00
             
             ## remove the first test-run green .raw and .json
-            os.remove(output_fname) # remove the yielded raw and json file
+            os.remove(output_fname)
             os.remove(output_fname.replace('.raw','.json'))
             
             # take a new green image with the adjusted shutter and gain
@@ -337,18 +338,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
             self.cam0_mean1 = self.extract_masked_mean(raw_2d_G,'cam0')
             self.save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
+        
+        ## if ground_mode is True, take the second green image with the shutter and gain adjusted based on the second uv image
+        if ground_mode is True:
+            change_factor2=self.cam1_mean2/self.cam0_mean1
             
-            if ground_mode is True:
-                increase_factor2=self.cam1_mean2/self.cam0_mean1
-                
-                shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), increase_factor2)
-                output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
-                while os.path.exists(output_fname2) is False:
-                    print(f"Waiting for UV image file to be created: {output_fname2}")
-                    time.sleep(1)
-                time.sleep(5)  # wait for file to be fully written
-                raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
-                self.save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
+            shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), change_factor2)
+            output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
+            while os.path.exists(output_fname2) is False:
+                print(f"Waiting for UV image file to be created: {output_fname2}")
+                time.sleep(1)
+            time.sleep(5)  # wait for file to be fully written
+            raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
+            self.save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
                 
     def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=True):
         if output_path is False:
@@ -374,13 +376,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             os.remove(output_fname)
             if self.cam1_mean1<4096*1.05:
                 # underexposed
-                increase_factor = 4096*1.05/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
+                change_factor = 4096*1.05/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
             if self.cam1_mean1>45000:
                 # overexposed
-                increase_factor = 45000/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
+                change_factor = 45000/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
            
             # take a new uv_img1
-            shutter1,gain1 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
+            shutter1,gain1 = adjust_shutter_gain(float(shutter1),float(gain1), change_factor)
             output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
             while os.path.exists(output_fname) is False:
                 print(f"Waiting for UV image file to be created: {output_fname}")
@@ -393,8 +395,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
 
         if ground_mode is True:
-            increase_factor=45000/self.cam1_mean1 # target mean intensity for the masked area is 20000 # need update with horizon detection
-            shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), increase_factor)
+            change_factor=45000/self.cam1_mean1 # target mean intensity for the masked area is 20000 # need update with horizon detection
+            shutter12,gain12 = adjust_shutter_gain(float(shutter1),float(gain1), change_factor)
             output_fname2 = self.call_libcamera_raw(1,shutter12,gain12,output_path,img_idx)
             print('ground_mode UV_img2')
             print(output_fname2)
