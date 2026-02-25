@@ -398,7 +398,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             output_fname = self.call_libcamera_raw(1, shutter1, gain1, output_path, img_idx)
 
             # wait max.30 seconds for the new image to be created, otherwise raise timeout error
-            for _ in range(30): 
+            for _ in range(3): 
                 if os.path.exists(output_fname):
                     break
                 time.sleep(1)
@@ -629,6 +629,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.on_green_shoot(cam0_data_path,img_idx=idx)
 
             print(f"Waiting for ISI: {self.isi}s before next position...")
+        print("the full pano session completed.")
+        self.save_config(os.path.join(pano_data_path, "pano_config.json"))
     
     def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
