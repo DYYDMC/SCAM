@@ -121,6 +121,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "uv_shutter": self.spinBox_uv_shutter.value(),
             "uv_gain": self.doubleSpinBox_uv_gain.value()
         }
+        if hasattr(self,"cam_path") and self.cam_path is not None:
+            config["cam_path"] = self.cam_path
+            
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=4)
         print(f"Configuration saved to {config_path}")
@@ -480,7 +483,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # hardcode pan/tilt step to 1 degree
             self.pan_step = 1
             self.tilt_step = 1
-            cam_path = self.calculate_pano_positions()
+            self.cam_path = self.calculate_pano_positions()
             # save the scan positions
             np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=cam_path)
             for idx, (pan, tilt) in enumerate(cam_path):
@@ -608,7 +611,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         os.makedirs(cam1_data_path, exist_ok=True)
         
         print(f"Starting PANO...")
-        cam_path = self.calculate_pano_positions()
+        self.cam_path = self.calculate_pano_positions()
         print(f"Total positions to take CAM photos: {len(cam_path)}")
         for idx, (pan, tilt) in enumerate(cam_path):
             ## move the motors
@@ -719,7 +722,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         print(f"Data will be saved to: {scam_data_path}")
         self.on_update_parameters()
-        cam_path = self.calculate_pano_positions()
+        self.cam_path = self.calculate_pano_positions()
         print(f"Total positions to take CAM photos: {len(cam_path)}")
         
         # Iterate over all pan and tilt positions
