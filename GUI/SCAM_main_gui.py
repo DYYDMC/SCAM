@@ -281,7 +281,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
-    def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=True):
+    def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=False):
         if output_path is False:
             output_path = GUI_CAM0
         
@@ -310,16 +310,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_G = extract_G_raw(raw_2d)
         self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
+        
+        ## check if the first green image is underexposed or overexposed
         if self.cam1_mean1 is not None:
             change_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
         else:
             change_factor1 = 1.0
-        
+            
+        ## check if the change factor is within the acceptable range (0.95-1.05)
         if change_factor1<.95 or change_factor1>1.05:
             ## need adjustment
             shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), change_factor1)
-            ## store the first green img's shutter and gain for the later use in the ground mode
-            self.cam0_shutter00 = shutter00; self.cam0_gain00 = gain00
             
             ## remove the first test-run green .raw and .json
             os.remove(output_fname)
@@ -333,6 +334,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(5)  # wait for file to be fully written
             raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
             self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
+        ## store the first green img's shutter and gain for the later use in the ground mode
+        self.cam0_shutter00 = shutter00; self.cam0_gain00 = gain00
         save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
         
         ## if ground_mode is True, take the second green image with the shutter and gain adjusted based on the second uv image
@@ -350,7 +353,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
             save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
                 
-    def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=True):
+    def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=False):
         if output_path is False:
             output_path = GUI_CAM1
         print('pressed UV shoot')
