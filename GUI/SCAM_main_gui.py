@@ -373,10 +373,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_B = extract_B_raw(raw_2d)
         self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
-        save_as_jpg(raw_2d_B,output_fname.replace('.raw','_preview_B.jpg'))
         
         print(f'initial cam1_mean1: {self.cam1_mean1}:,{4096*1.05/self.cam1_mean1},{45000/self.cam1_mean1}')
-        MAX_EXPO_RETRY = 2
+        MAX_EXPO_RETRY = 1
         TARGET_LOW = 4096 * 1.05
         TARGET_HIGH = 45000
 
@@ -388,6 +387,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             if os.path.exists(output_fname):
                 os.remove(output_fname)
+                os.remove(output_fname.replace('.raw','.json'))
 
             if self.cam1_mean1 < TARGET_LOW:
                 change_factor = TARGET_LOW / self.cam1_mean1
@@ -413,6 +413,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Exposure not converged after {MAX_EXPO_RETRY} retries, use last values.")
             
         self.shutter1 = shutter1;self.gain1 = gain1
+        print('saving the first UV image with adjusted exposure as .jpg')
         save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
 
         if ground_mode is True:
@@ -452,7 +453,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pan_oneScan = self.spinBox_pan_oneScan.value()
         self.tilt_oneScan = self.spinBox_tilt_oneScan.value()
         self.int_oneScan = self.spinBox_int_oneScan.value()
+        
+        ## horrible duplicates, a make-do solution rn but need fix
         self.isi_oneScan = self.spinBox_isi_oneScan.value()
+        self.isi = self.spinBox_isi_oneScan.value()
     def motor_wait(self):
         delta_t = 0.3*(abs(self.next_tilt-self.current_tilt))+0.1*abs(self.next_pan-self.current_pan)
         time.sleep(int(delta_t)+1)
@@ -617,6 +621,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
         
             ## take photos with both cameras
+            # deactivate uv_for inside-test run
             print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_uv_shoot(cam1_data_path,img_idx=idx)
             

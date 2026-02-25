@@ -87,9 +87,8 @@ def extract_masked_mean(raw_chan,camera):
     return mean_
     
 def save_as_jpg(input_2d,output_file):
-        plt.imshow(input_2d,cmap='gray')
-        if "cam0" in output_file:
-            plt.savefig(output_file)
+    plt.imshow(input_2d,cmap='gray')
+    plt.savefig(output_file)
 def adjust_shutter_gain(shutter,gain, change_factor):
     min_shutter, max_shutter = 1.0, 1000.0
     min_gain, max_gain = 1.12, 8.0
