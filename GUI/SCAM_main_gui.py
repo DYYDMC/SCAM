@@ -335,7 +335,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
             self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
         ## store the first green img's shutter and gain for the later use in the ground mode
-        self.cam0_shutter00 = shutter00; self.cam0_gain00 = gain00
+        self.cam0_shutter00 = shutter0; self.cam0_gain00 = gain0
         save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
         
         ## if ground_mode is True, take the second green image with the shutter and gain adjusted based on the second uv image
