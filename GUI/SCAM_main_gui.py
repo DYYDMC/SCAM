@@ -341,7 +341,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 change_factor2=self.cam1_mean2/self.cam0_mean1 # target/measured
             else:
                 change_factor2 = 1.0
-            shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), change_factor2)
+            shutter01,gain01 = adjust_shutter_gain(float(self.cam0_shutter00),float(self.cam0_gain00), change_factor2)
             output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
             while os.path.exists(output_fname2) is False:
                 print(f"Waiting for UV image file to be created: {output_fname2}")
