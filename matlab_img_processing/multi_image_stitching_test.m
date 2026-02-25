@@ -5,7 +5,8 @@ montage(buildingScene.Files)
 
 %%
 I = readimage(buildingScene,1);
-grayImage = I;
+%I = readimage(buildingScene,4);
+grayImage = im2gray(I);
 points = detectSURFFeatures(grayImage);
 [features,points] = extractFeatures(grayImage,points);
 
@@ -21,7 +22,8 @@ for n = 2:numImages
     featuresPrevious = features;
         
     I = readimage(buildingScene, n);
-    grayImage = I ;
+    %grayImage = I ;
+    grayImage=im2gray(I);
     imageSize(n,:) = size(grayImage);
     
     points = detectSURFFeatures(grayImage);
@@ -74,44 +76,34 @@ xLimits = [xMin xMax];
 yLimits = [yMin yMax];
 panoramaView = imref2d([height width],xLimits,yLimits);
 
-% %%
-% panorama = zeros([height width],"like",I);
-% for idx = 1:numImages
-%     I = readimage(buildingScene,idx);   
-%     warpedImage = imwarp(I,tforms(idx),OutputView=panoramaView);                 
-%     mask = imwarp(true(size(I,1),size(I,2)),tforms(idx),OutputView=panoramaView);
-% 
-%     %imblend is basically doing hard overlay → this causes visible seams.
-%     panorama = imblend(warpedImage,panorama,mask,foregroundopacity=1);
-% end
-% 
-% imshow(panorama)
-%% Warp all images and store them
-
+%% Build distance masks
 warpedImages = cell(numImages,1);
 warpedMasks  = cell(numImages,1);
-
-% Here warpedMasks are logical, 0/1 against the assumption of multi-band blending,
-% which is "The masks define a smooth transition region between images."
-% for idx = 1:numImages
-%     I = readimage(buildingScene,idx);   
-%     warpedImages{idx} = imwarp(I,tforms(idx),OutputView=panoramaView);
-%     warpedMasks{idx}  = imwarp(true(size(I,1),size(I,2)),...
-%                                tforms(idx),OutputView=panoramaView);
-% end
 
 for idx = 1:numImages
     I = readimage(buildingScene,idx);   
     warpedImages{idx} = imwarp(I,tforms(idx),OutputView=panoramaView);
+
     mask = imwarp(true(size(I,1),size(I,2)),...
                   tforms(idx),OutputView=panoramaView);
 
-    % distance from boundary
     D = bwdist(~mask);
-    D = D ./ max(D(:));   % normalize
-    
     warpedMasks{idx} = D;
 end
+
+%% Normalize masks across images (CRITICAL STEP)
+
+sumMask = zeros(size(warpedMasks{1}));
+
+for idx = 1:numImages
+    sumMask = sumMask + warpedMasks{idx};
+end
+
+for idx = 1:numImages
+    warpedMasks{idx} = warpedMasks{idx} ./ (sumMask + eps);
+end
+%%
+imshow(sumMask,[])
 %% Convert to double (important for 16-bit)
 for idx = 1:numImages
     warpedImages{idx} = double(warpedImages{idx});
@@ -125,8 +117,9 @@ b = zeros(n,1);
 
 for i = 1:n
     for j = i+1:n
-        
-        overlap = warpedMasks{i} & warpedMasks{j};
+        overlap = (warpedMasks{i} > 0) & (warpedMasks{j} > 0);
+        % overlap = warpedMasks{i} & warpedMasks{j}; -> for logical mask,
+        % not double type
         if nnz(overlap) < 500
             continue;
         end
@@ -209,8 +202,7 @@ end
 panorama = uint16(max(min(panorama,65535),0));
 %% save intermediate panorama
 dir = uigetdir("Title","Please select the folder to save the intermediate result.");
-
-imwrite(panorama, fullfile(dir, sprintf('panorama_scriptGenMultiBandBlended_uv.tiff')));
+imwrite(panorama, fullfile(dir, sprintf('panorama_scriptGenMultiBandBlendedV1_uv.tiff')));
 %%
 function G = buildGaussianPyramid(img, levels)
 
