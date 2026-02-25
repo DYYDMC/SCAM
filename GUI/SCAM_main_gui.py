@@ -485,15 +485,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.tilt_step = 1
             self.cam_path = self.calculate_pano_positions()
             # save the scan positions
-            np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=cam_path)
-            for idx, (pan, tilt) in enumerate(cam_path):
+            np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=self.cam_path)
+            for idx, (pan, tilt) in enumerate(self.cam_path):
                 ## move motors
                 self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
                 self.next_pan = pan
                 self.next_tilt = tilt
                 self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                 self.motor_wait()
-                print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
+                print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
                 
                 # spectral scan
                 for _ in range(3): # max 3 iteration testing 
@@ -612,8 +612,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         print(f"Starting PANO...")
         self.cam_path = self.calculate_pano_positions()
-        print(f"Total positions to take CAM photos: {len(cam_path)}")
-        for idx, (pan, tilt) in enumerate(cam_path):
+        self.save_config(os.path.join(pano_data_path, "pano_config.json"))
+        print(f"Total positions to take CAM photos: {len(self.cam_path)}")
+        for idx, (pan, tilt) in enumerate(self.cam_path):
             ## move the motors
             self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
             self.next_pan = pan
@@ -621,19 +622,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             self.stepper_controller.move_to(self.next_pan, self.next_tilt)
             self.motor_wait()
-            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
+            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
         
             ## take photos with both cameras
             # deactivate uv_for inside-test run
-            print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+            print(f"Taking pano (UV) photo no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_uv_shoot(cam1_data_path,img_idx=idx)
             
-            print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+            print(f"Taking pano (GREEN) photo no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_green_shoot(cam0_data_path,img_idx=idx)
 
             print(f"Waiting for ISI: {self.isi}s before next position...")
         print("the full pano session completed.")
-        self.save_config(os.path.join(pano_data_path, "pano_config.json"))
+        
     
     def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
@@ -723,11 +724,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f"Data will be saved to: {scam_data_path}")
         self.on_update_parameters()
         self.cam_path = self.calculate_pano_positions()
-        print(f"Total positions to take CAM photos: {len(cam_path)}")
+        self.save_config(os.path.join(scam_data_path, "scam_config.json"))
+        print(f"Total positions to take CAM photos: {len(self.cam_path)}")
         
         # Iterate over all pan and tilt positions
-        for idx, (pan, tilt) in enumerate(cam_path):
-            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
+        for idx, (pan, tilt) in enumerate(self.cam_path):
+            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
             self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
             self.next_pan = pan
             self.next_tilt = tilt
@@ -735,7 +737,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.stepper_controller.move_to(self.next_pan, self.next_tilt)
             self.motor_wait()
             
-            print(f"Taking photo scan no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
+            print(f"Taking photo scan no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_uv_shoot(output_path=cam1_data_path,img_idx=idx,ground_mode=False)
             print('finished uv photo')
             self.on_green_shoot(output_path=cam0_data_path,img_idx=idx,ground_mode=False)
@@ -766,7 +768,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     print(f"Waiting for ISI: {self.isi}s before next position...")
                     time.sleep(self.isi)
         print("the full SCAM session completed.")
-        self.save_config(os.path.join(scam_data_path, "scam_config.json"))
+        
         
 if __name__ == '__main__':
     app = QApplication(sys.argv)
