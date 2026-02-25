@@ -100,6 +100,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ## initialize parameters
         self.cam0_shutter00 = None
         self.cam0_gain00 = None
+        self.cam1_mean1 =None
+        self.cam1_mean2 = None
         
         self.connect_signals()
     def save_config(self, config_path):
@@ -308,7 +310,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_G = extract_G_raw(raw_2d)
         self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
-        change_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
+        if self.cam1_mean1 is not None:
+            change_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
+        else:
+            change_factor1 = 1.0
         
         if change_factor1<.95 or change_factor1>1.05:
             ## need adjustment
@@ -332,8 +337,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         ## if ground_mode is True, take the second green image with the shutter and gain adjusted based on the second uv image
         if ground_mode is True:
-            change_factor2=self.cam1_mean2/self.cam0_mean1
-            
+            if self.cam1_mean1 is not None:
+                change_factor2=self.cam1_mean2/self.cam0_mean1 # target/measured
+            else:
+                change_factor2 = 1.0
             shutter01,gain01 = adjust_shutter_gain(float(shutter00),float(gain00), change_factor2)
             output_fname2 = self.call_libcamera_raw(0,shutter01,gain01,output_path,img_idx)
             while os.path.exists(output_fname2) is False:
