@@ -38,6 +38,7 @@ HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
 ROI_PATH = os.path.join(SCAM_PATH, "roi")
+PANO_DATA_PATH = os.path.join(SCAM_PATH, "pano_data")
 DATA_PATH = os.path.join(SCAM_PATH, "data")
 ONE_SCAM_DATA_PATH = os.path.join(SCAM_PATH, "one_scam_data")
 SCAN_DATA_PATH = os.path.join(SCAM_PATH, "scan") # point scan
@@ -590,14 +591,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Error during SCAN calibration: {str(e)}")
         
     def on_start_pano(self):
-        if not hasattr(self,"num_pan") or not hasattr(self,'num_tilt'):
-            self.on_update_parameters()
-        if not hasattr(self, 'int_t') or not hasattr(self, 'isi'):
-            self.on_spec_scan()
-            
+        self.on_update_parameters()
+        
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        cam0_data_path = os.path.join(CHESS_PATH, f"cam0_{start_time}")
-        cam1_data_path = os.path.join(CHESS_PATH, f"cam1_{start_time}")
+        pano_data_path = os.path.join(PANO_DATA_PATH, f"PANO_{start_time}")
+        os.makedirs(pano_data_path, exist_ok=True)
+        
+        cam0_data_path = os.path.join(pano_data_path, "cam0")
+        cam1_data_path = os.path.join(pano_data_path, "cam1")
+        
         os.makedirs(cam0_data_path, exist_ok=True)
         os.makedirs(cam1_data_path, exist_ok=True)
         
@@ -605,19 +607,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cam_path = self.calculate_pano_positions()
         print(f"Total positions to take CAM photos: {len(cam_path)}")
         for idx, (pan, tilt) in enumerate(cam_path):
-            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
-            self.stepper_controller.move_to(pan, tilt)
-            ## wait until the target position is reached
+            ## move the motors
+            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+            self.next_pan = pan
+            self.next_tilt = tilt
             
+            self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+            self.motor_wait()
+            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(cam_path)})")
+        
+            ## take photos with both cameras
             print(f"Taking pano (UV) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_uv_shoot(cam1_data_path,img_idx=idx)
+            
             print(f"Taking pano (GREEN) photo no.{idx+1}/{len(cam_path)} at Pan: {pan}, Tilt: {tilt}")
             self.on_green_shoot(cam0_data_path,img_idx=idx)
-            # in E5 chessboard calibration
-            
+
             print(f"Waiting for ISI: {self.isi}s before next position...")
-            self.cam1_ground_mean = None
-            self.cam1_sky_mean = None
     
     def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
