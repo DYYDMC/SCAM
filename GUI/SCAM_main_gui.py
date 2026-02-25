@@ -97,6 +97,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Add the matplotlib canvas to the layout
         layout.addWidget(self.spectrum_canvas)
         
+        ## initialize parameters
+        self.cam0_shutter00 = None
+        self.cam0_gain00 = None
+        
         self.connect_signals()
     def save_config(self, config_path):
         """Save current configuration to a JSON file"""
