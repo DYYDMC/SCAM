@@ -375,25 +375,42 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         save_as_jpg(raw_2d_B,output_fname.replace('.raw','_preview_B.jpg'))
         
         print(f'initial cam1_mean1: {self.cam1_mean1}:,{4096*1.05/self.cam1_mean1},{45000/self.cam1_mean1}')
-        while self.cam1_mean1<4096*1.05 or self.cam1_mean1>45000:
-            os.remove(output_fname)
-            if self.cam1_mean1<4096*1.05:
-                # underexposed
-                change_factor = 4096*1.05/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
-            if self.cam1_mean1>45000:
-                # overexposed
-                change_factor = 45000/self.cam1_mean1 # target intensity for the masked area is 4096*1.05
-           
-            # take a new uv_img1
-            shutter1,gain1 = adjust_shutter_gain(float(shutter1),float(gain1), change_factor)
-            output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
-            while os.path.exists(output_fname) is False:
-                print(f"Waiting for UV image file to be created: {output_fname}")
+        MAX_EXPO_RETRY = 2
+        TARGET_LOW = 4096 * 1.05
+        TARGET_HIGH = 45000
+
+        for _ in range(MAX_EXPO_RETRY):
+            if TARGET_LOW <= self.cam1_mean1 <= TARGET_HIGH:
+                break
+            if self.cam1_mean1 is None or self.cam1_mean1 <= 0:
+                raise RuntimeError(f"Invalid cam1_mean1: {self.cam1_mean1}")
+
+            if os.path.exists(output_fname):
+                os.remove(output_fname)
+
+            if self.cam1_mean1 < TARGET_LOW:
+                change_factor = TARGET_LOW / self.cam1_mean1
+            else:
+                change_factor = TARGET_HIGH / self.cam1_mean1
+
+            shutter1, gain1 = adjust_shutter_gain(float(shutter1), float(gain1), change_factor)
+            output_fname = self.call_libcamera_raw(1, shutter1, gain1, output_path, img_idx)
+
+            # wait max.30 seconds for the new image to be created, otherwise raise timeout error
+            for _ in range(30): 
+                if os.path.exists(output_fname):
+                    break
                 time.sleep(1)
+            else:
+                raise TimeoutError(f"UV image not created in time: {output_fname}")
+
             time.sleep(5)
             raw_2d = cut_raw_black_lines(output_fname)
             raw_2d_B = extract_B_raw(raw_2d)
-            self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
+            self.cam1_mean1 = extract_masked_mean(raw_2d_B, 'cam1')
+        else:
+            print(f"Exposure not converged after {MAX_EXPO_RETRY} retries, use last values.")
+            
         self.shutter1 = shutter1;self.gain1 = gain1
         save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
 
