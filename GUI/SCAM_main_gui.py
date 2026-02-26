@@ -122,8 +122,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "uv_gain": self.doubleSpinBox_uv_gain.value()
         }
         if hasattr(self,"cam_path") and self.cam_path is not None:
-            config["cam_path"] = self.cam_path
-            
+            config["cam_path"] = np.asarray(self.cam_path).tolist()
+        for key in config.keys():
+            print(f'{key}: type: {type(config[key])}')
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=4)
         print(f"Configuration saved to {config_path}")
