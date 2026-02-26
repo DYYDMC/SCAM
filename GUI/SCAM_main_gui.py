@@ -767,8 +767,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 
                     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                     self.motor_wait()
-
-                    result = self.on_spec_scan()
+                    # adjust the integration time based on the previous scan result at the same tilt position
+                    self.int_oneScan = self.adjust_int_t(self.int_oneScan)
+                    
+                    result = self.spec_controller.scan(self.int_oneScan)
                     # print(f'max nm:{max_nm}')
                     if result:
                         #print("Scan successful, saving data...")
