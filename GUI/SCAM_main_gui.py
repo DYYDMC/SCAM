@@ -305,10 +305,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
         print(f'output_fname:{output_fname}')
         while os.path.exists(output_fname) is False:
+            # do not continue when the file is not created
             print(f"Waiting for Green image file to be created: {output_fname}")
-            time.sleep(1)
-        # wait for file to be fully written
-        time.sleep(5)  
         
         ## adjust shutter and gain based on the first uv_image and the first green_img
         raw_2d = cut_raw_black_lines(output_fname)
