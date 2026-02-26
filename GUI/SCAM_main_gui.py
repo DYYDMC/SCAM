@@ -40,6 +40,7 @@ CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
 ROI_PATH = os.path.join(SCAM_PATH, "roi")
 POINT_SCAN_DATA_PATH = os.path.join(SCAM_PATH, "point_scan_data")
 PANO_DATA_PATH = os.path.join(SCAM_PATH, "pano_data")
+FULL_SCAM_PATH = os.path.join(SCAM_PATH, "full_scam")
 DATA_PATH = os.path.join(SCAM_PATH, "data")
 ONE_SCAM_DATA_PATH = os.path.join(SCAM_PATH, "one_scam_data")
 SCAN_DATA_PATH = os.path.join(SCAM_PATH, "scan") # point scan
@@ -723,21 +724,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
     def on_start_full_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        scam_data_path = os.path.join(DATA_PATH, f"SCAM_{start_time}")
-        os.makedirs(scam_data_path, exist_ok=True)
+        full_scam_data_path = os.path.join(FULL_SCAM_PATH, f"SCAM_{start_time}")
+        os.makedirs(full_scam_data_path, exist_ok=True)
         
-        cam0_data_path = os.path.join(scam_data_path, "cam0")
-        cam1_data_path = os.path.join(scam_data_path, "cam1")
-        scan_data_path = os.path.join(scam_data_path, "scan_data")
+        cam0_data_path = os.path.join(full_scam_data_path, "cam0")
+        cam1_data_path = os.path.join(full_scam_data_path, "cam1")
+        scan_data_path = os.path.join(full_scam_data_path, "scan_data")
         
         os.makedirs(cam0_data_path, exist_ok=True)
         os.makedirs(cam1_data_path, exist_ok=True)
         os.makedirs(scan_data_path, exist_ok=True)
         
-        print(f"Data will be saved to: {scam_data_path}")
+        print(f"Data will be saved to: {full_scam_data_path}")
         self.on_update_parameters()
         self.cam_path = self.calculate_pano_positions()
-        self.save_config(os.path.join(scam_data_path, "scam_config.json"))
+        self.save_config(os.path.join(full_scam_data_path, "scam_config.json"))
         print(f"Total positions to take CAM photos: {len(self.cam_path)}")
         
         # Iterate over all pan and tilt positions
