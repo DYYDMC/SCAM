@@ -471,8 +471,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_start_full_scan(self):
         print("I AM HERE!! FULL SCAN!")
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        scan_save_path = os.path.join(FULL_SCAN_PATH, f"SCAN_{start_time}")
-        os.makedirs(scan_save_path, exist_ok=True)
+        full_scan_save_path = os.path.join(FULL_SCAN_PATH, f"FULL_SCAN_{start_time}")
+        os.makedirs(full_scan_save_path, exist_ok=True)
         """Start full spectral scan for scene reconstruction"""
         try:
             self.on_update_parameters()
@@ -481,7 +481,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.tilt_step = 1
             self.cam_path = self.calculate_pano_positions()
             # save the scan positions
-            np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=self.cam_path)
+            np.savez(os.path.join(full_scan_save_path,'scan_positions.npz'),positions=self.cam_path)
             for idx, (pan, tilt) in enumerate(self.cam_path):
                 ## move motors
                 # where we are
@@ -493,36 +493,39 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                 self.motor_wait()
                 print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
+                # adjust the integration time based on the previous scan result at the same tilt position
                 
-                # spectral scan
-                for _ in range(3): # max 3 iteration testing 
-                    measurement = self.spec_controller.scan(self.int_oneScan)
-                    peak = measurement["intensity"].max()
-                    
-                    if .25*16383 <= peak <= .75*16383: # linearity range for the STUV-100
-                        break
-                    factor = .5*16383 / peak
-
-                    # stability clamp
-                    factor = max(0.5, min(20.0, factor))
-                    new_int = int(self.int_oneScan * factor)
-                    new_int = max(1, min(5999, new_int)) # make sure new_int is between 1ms and 6second
-
-                    if new_int == self.int_oneScan:
-                        break
-                    self.int_oneScan = new_int
-                    
-                print(f'Integration time: {self.int_oneScan} ms')
+                self.int_oneScan = self.adjust_int_t(self.int_oneScan)
 
                 result_ = self.spec_controller.scan(self.int_oneScan)
                 result_['motor_pan'] = pan
                 result_['motor_tilt'] = tilt
                 result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
 
-                np.save(os.path.join(scan_save_path, f"full_scan_{idx}"), result_)
+                np.save(os.path.join(full_scan_save_path, f"full_scan_{idx}_{pan}_{tilt}"), result_)
                 time.sleep(self.isi_oneScan)
         except Exception as e:
             print(f"Error during full scan: {str(e)}")
+    
+    def adjust_int_t(self,int_t,num_max_adjust=3,min_ADC=0.25*16383,max_ADC=0.75*16383,target_ADC=0.5*16383):
+        for _ in range(num_max_adjust):
+            measurement = self.spec_controller.scan(int_t)
+            peak = measurement["intensity"].max()
+            if min_ADC <= peak <= max_ADC: # linearity range for the STUV-100
+                break
+            factor = target_ADC / peak
+            
+            # stability clamp
+            factor = max(0.5, min(20.0, factor))
+            new_int = int(int_t * factor)
+            
+            new_int = max(1, min(5999, new_int)) # make sure new_int is between 0.156microsec and 600ms
+            print(" int_t after adjustment:", new_int)
+            if new_int == int_t:
+                break
+            int_t = new_int
+        
+        return int_t
         
     def on_start_point_scan(self):
         """
@@ -560,31 +563,31 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             with open(os.path.join(point_scan_save_path,'point_scan_config.json'), 'w') as f:
                 json.dump(point_scan_config, f, indent=4)
             
-            ## take photo preview at the two positions before the scan
-            for tt,tilt in enumerate([sky_tilt,ground_tilt]):
-                ## move the motors
-                self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-                self.next_pan = pan
-                self.next_tilt = tilt
+            # ## take photo preview at the two positions before the scan
+            # for tt,tilt in enumerate([sky_tilt,ground_tilt]):
+            #     ## move the motors
+            #     self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+            #     self.next_pan = pan
+            #     self.next_tilt = tilt
                 
-                self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-                self.motor_wait()
-                ## take a photo preivew
-                self.on_uv_shoot(point_scan_save_path,img_idx=tt,ground_mode=False)
-                self.on_green_shoot(point_scan_save_path,img_idx=tt,ground_mode=False)
-                # Remove all .raw and .json files under the defined path "point_scan_save_path" using glob
-                for file_path in glob.glob(os.path.join(point_scan_save_path, "*.raw")):
-                    os.remove(file_path)
-                    print(f"Removed file: {file_path}")
-                for file_path in glob.glob(os.path.join(point_scan_save_path, "*.json")):
-                    os.remove(file_path)
-                    print(f"Removed file: {file_path}")
+            #     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+            #     self.motor_wait()
+            #     ## take a photo preivew
+            #     self.on_uv_shoot(point_scan_save_path,img_idx=tt,ground_mode=False)
+            #     self.on_green_shoot(point_scan_save_path,img_idx=tt,ground_mode=False)
+            #     # Remove all .raw and .json files under the defined path "point_scan_save_path" using glob
+            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.raw")):
+            #         os.remove(file_path)
+            #         print(f"Removed file: {file_path}")
+            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.json")):
+            #         os.remove(file_path)
+            #         print(f"Removed file: {file_path}")
                 
             print(f"Starting POINT SCAN:")
             # init integration time for different tilts
             int_t_dict = {
-                'sky': self.spinBox_int_oneScan.value(),
-                'ground': self.spinBox_int_oneScan.value()
+                'sky': self.int_oneScan,
+                'ground': self.int_oneScan
             }
             for ii in range(POINT_SCAN_INTERATION): # max 3 iteration testing
                 for tt,key in zip([sky_tilt,ground_tilt],['sky','ground']):
@@ -595,24 +598,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     
                     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                     self.motor_wait()
-                    for _ in range(3): # max 3 iteration adjusting integration time 
-                        ## test scan with UI input integration time
-                        measurement = self.spec_controller.scan(int_t_dict[key])
-                        peak = measurement["intensity"].max()
-                        
-                        if .25*16383 <= peak <= .75*16383: # linearity range for the STUV-100
-                            break
-                        factor = .5*16383 / peak
-
-                        # stability clamp
-                        factor = max(0.5, min(20.0, factor))
-                        new_int = int(int_t_dict[key] * factor)
-                        new_int = max(1, min(5999, new_int)) # make sure new_int is between 1ms and 6second
-
-                        if new_int == self.int_oneScan:
-                            break
-                        int_t_dict[key]= new_int
                     
+                    # adjust integration time based on the previous scan result at the same tilt position
+                    int_t_dict[key] = self.adjust_int_t(int_t_dict[key])
+                    print('finished adjust_int_t(), now int_t for {} tilt is {}'.format(key,int_t_dict[key]))
                     result_ = self.spec_controller.scan(int_t_dict[key])
                     result_['motor_pan'] = pan
                     result_['motor_tilt'] = tt
