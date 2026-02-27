@@ -1,10 +1,10 @@
 %% load preprocessed images
-img_l_full = imread('tilt_0_left.tiff'); % left
-img_r_full = imread('tilt_0_right.tiff'); % right
-
+img_l_full = imread('tilt_10_left.tiff'); % left
+img_r_full = imread('tilt_10_right.tiff'); % right
+%%
 % crop or select ROIs (from visual inspection)
-img_l = img_l_full(20:1065,60:2676,:);
-img_r = img_r_full(20:1065,36:2656,:);
+img_l = img_l_full;% crop_pano_to_largest_valid_rect(img_l_full);
+img_r = img_r_full;%crop_pano_to_largest_valid_rect(img_r_full);
 
 % keep RGB for final panorama
 img_l_rgb = img_l;
@@ -84,5 +84,5 @@ imshowpair(panorama,panorama_rotat)
 figure; imshow(panorama); title('Stitched Panorama');
 
 %% optionally save result
-imwrite(panorama, 'panorama_LR_stitched.tiff');
-imwrite(panorama_rotat, 'panorama_LR_stitched_rotated.tiff');
+imwrite(panorama, 'panorama_uncroppedLR_stitched_tilt10.tiff');
+imwrite(panorama_rotat, 'panorama_uncroppedLR_stitched_tilt10_rotated.tiff');
