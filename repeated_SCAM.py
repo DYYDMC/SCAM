@@ -62,7 +62,7 @@ scan_data = {
     'num_scan_perPos': num_scan_perPos,
     'measurements': {},
 }
-for hhvv in range(1,10):
+for hhvv in range(10):
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     output_dir = os.path.join(PATHS['data'], timestamp)
     os.makedirs(output_dir, exist_ok=True)

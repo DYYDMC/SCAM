@@ -1,37 +1,53 @@
 #!/bin/bash
-source "$(dirname "${BASH_SOURCE[0]}")/../cam_roi/camera_config.sh"
-CAM_ROI_PATH="$(dirname "${BASH_SOURCE[0]}")/../cam_roi"
-CALI_PATH="$(dirname "${BASH_SOURCE[0]}")/../cali"
+BASE_DIR="$(dirname "${BASH_SOURCE[0]}")"
+CAM_ROI_PATH="${BASE_DIR}/../cam_roi"
+CALI_PATH="${BASE_DIR}/../cali"
 CAMERA_CONFIG_PATH="${CAM_ROI_PATH}/camera_config.sh"
 source "$CAMERA_CONFIG_PATH"
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
+# Function to check and kill any existing libcamera-vid process
+check_and_kill_libcamera() {
+    local device_path="/dev/video4"
+    local retries=5
+
+    # Gracefully terminate libcamera-vid
+    if pkill -15 -f libcamera-vid >/dev/null 2>&1; then
+        sleep 1
+        if pgrep -f libcamera-vid >/dev/null 2>&1; then
+            pkill -9 -f libcamera-vid >/dev/null 2>&1
+            sleep 1
+        fi
+    fi
+
+    # Ensure the device is free
+    while lsof "$device_path" >/dev/null 2>&1 && (( retries-- > 0 )); do
+        sudo fuser -k "$device_path" >/dev/null 2>&1
+        sleep 1
+    done
+
+    # Reload kernel module as a last resort
+    if lsof "$device_path" >/dev/null 2>&1; then
+        sudo modprobe -r bcm2835-v4l2 >/dev/null 2>&1 && sudo modprobe bcm2835-v4l2 >/dev/null 2>&1
+        sleep 1
+    fi
+}
 
 # Main execution logic
-echo "capture raw1?: $1" # caputre_raw
-echo "camera id2?: $2" # 0 camera id
-echo "gain3?: $3" # 1.2 gain
-echo "shutterms4?: $4" # 30 ms
-echo "outputdir5?: $5" # output dir
-echo "imgid6?: $6" # image index
+echo "capture raw1?: $1"
+echo "camera id2?: $2"
+echo "gain3?: $3"
+echo "shutterms4?: $4"
+echo "outputdir5?: $5"
+echo "imgid6?: $6"
 
-# using configs from the energy folder, flipping applied
-if [[ "$2" == "0" ]]; then
-    echo "Using camera 0"
-    RAW_CONFIG_PATH="$(dirname "${BASH_SOURCE[0]}")/../energy/green_raw_config.txt"
-else
-    echo "Using camera 1"
-    RAW_CONFIG_PATH="$(dirname "${BASH_SOURCE[0]}")/../energy/uv_raw_config.txt"
-fi
+RAW_CONFIG_PATH="${BASE_DIR}/../energy/$( [[ "$2" == "0" ]] && echo "green" || echo "uv" )_raw_config.txt"
 
-echo "$4"
-if [[ "$4" -ge 500 ]]; then
-    TIMEOUT_MS=2000
-else
-    TIMEOUT_MS=1000
-fi
+TIMEOUT_MS=$(( $4 >= 500 ? 2000 : 1000 ))
+
 if [[ "$1" == "capture_raw" ]]; then
-    echo "take a RAW photo with the green camera"
-    check_and_kill_libcamera
+    if ! lsof /dev/video4 >/dev/null 2>&1; then
+        check_and_kill_libcamera
+    fi
 
     libcamera-raw \
         --analoggain "${3}" \
@@ -41,6 +57,10 @@ if [[ "$1" == "capture_raw" ]]; then
         --timeout "$TIMEOUT_MS" \
         -o "${5}/cam${2}_gain${3}_${4}ms_${6}.raw"
 
+    if [[ $? -ne 0 ]]; then
+        echo "Error: libcamera-raw failed" >&2
+        exit 1
+    fi
 elif [[ -z "$1" ]]; then
     echo "Default capture"
 else

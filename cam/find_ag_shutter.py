@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+import glob
 import numpy as np
 import cv2
 from datetime import datetime
@@ -9,43 +10,119 @@ import pickle
 # Define paths globally
 HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
+CALI_PATH = os.path.join(SCAM_PATH,"cali")
 CAM_PATH = os.path.join(SCAM_PATH, 'cam')
+CAM0_ROI_NPY = os.path.join(SCAM_PATH,'roi','cam0','cam0_roi.npy')
+CAM1_ROI_NPY = os.path.join(SCAM_PATH,'roi','cam1','cam1_roi.npy')
 DATA_PATH = os.path.join(SCAM_PATH, 'data')
 
-def call_bash_script(camera_id, shutter, analoggain, output_dir):
+# function to apply ROI
+def apply_roi_to_image(gray, roi_npy_path, output_path=None):
+    """
+    Apply ROI to an image and optionally save the result.
+    
+    Args:
+        gray (str): single channel img (raw, full resolution)
+        roi (tuple): (x_start_norm, y_start_norm, width_norm, height_norm)
+        output_path (str, optional): Path to save cropped image
+    
+    Returns:
+        numpy.ndarray: Cropped image
+    """
+    nrows, ncols = gray.shape[:2]
+    roi = np.load(roi_npy_path)
+    x_start_norm, y_start_norm, width_norm, height_norm = roi
+    
+    # Convert normalized coordinates to pixel coordinates
+    x_start = int(x_start_norm * ncols)
+    y_start = int(y_start_norm * nrows)
+    width = int(width_norm * ncols)
+    height = int(height_norm * nrows)
+    
+    # Ensure coordinates are within bounds
+    x_start = max(0, min(x_start, ncols-1))
+    y_start = max(0, min(y_start, nrows-1))
+    width = max(1, min(width, ncols - x_start))
+    height = max(1, min(height, nrows - y_start))
+    
+    # Crop the image
+    cropped = gray[y_start:y_start+height, x_start:x_start+width]
+    
+    if output_path:
+        cv2.imwrite(output_path, cropped)
+        print(f"Saved cropped image: {output_path} (Size: {cropped.shape[1]}x{cropped.shape[0]})")
+    
+    return cropped
+
+def call_bash_script(camera_id, shutter, analoggain, output_dir, img_idx=0):
     os.makedirs(output_dir, exist_ok=True)
-    img_filename = os.path.join(output_dir, f"cam{camera_id}_shutter{shutter}_ag{analoggain}.jpg")
-    subprocess.run(["bash", os.path.join(CAM_PATH,"cam_take_photo.sh"), img_filename,
-                    str(camera_id), str(shutter), str(analoggain)], check=True)
-    if not os.path.exists(img_filename):
-        raise FileNotFoundError(f"{img_filename} not created.")
-    return img_filename
+    print(f"Calling bash script for camera {camera_id} with shutter {shutter} and gain {analoggain}")
+    print('cmd:',["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', str(camera_id), shutter, analoggain,output_dir,str(img_idx)])
+    try:
+        # Use timeout to prevent hanging
+        print('before subprocess call')
+        result = subprocess.run(
+            ["/bin/bash", os.path.join(CALI_PATH, 'cali_cam_take_photo.sh'), 'capture_still', str(camera_id), shutter, analoggain,output_dir,str(img_idx)],
+            check=True,
+            timeout=30,  # 30 second timeout
+            capture_output=True,
+            text=True
+        )
+    except subprocess.TimeoutExpired:
+        #self.status_label.setText("Photo capture timed out")
+        print(f"Photo capture timed out")
+    except subprocess.CalledProcessError as e:
+        #self.status_label.setText("Photo capture failed")
+        print(f"Error: {e.stderr}")
+    except Exception as e:
+        #self.status_label.setText("Unexpected error")
+        print(f"Unexpected error: {e}")
+    pattern = f"*cam{camera_id}*.jpg"
+    try:
+        search_path = os.path.join(output_dir, pattern)
+        files = glob.glob(search_path)
+        if not files:
+            return None
+        latest_path = max(files, key=os.path.getmtime)
+        return os.path.basename(latest_path)
+    except Exception:
+        return None
 
 def analyze_image(img_filename):
     # Open the image
     img = cv2.imread(img_filename)  # Read the image using OpenCV
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB format
     
-    # Calculate the brightness of the image
     if 'cam0' in img_filename:
-        brightness = np.mean(img[500:-500,:-1296,1])  # Convert to grayscale and calculate mean brightness
-    if 'cam1' in img_filename:
-        brightness = np.mean(img[500:-500,:-1296,0])  # Convert to grayscale and calculate mean brightness
-    
-    # Define thresholds for overexposure and underexposure
-    overexposed_threshold = 240  # Example threshold for overexposure
+        gray = img[:,:,1] # G 
+    if 'cam1' in img_filename: 
+        gray = img[:,:,1] # Blue
+        
+    # crop it according to the CAM_roi
+    cropped = apply_roi_to_image(gray,
+                                 CAM0_ROI_NPY if 'cam0' in img_filename else CAM1_ROI_NPY,
+                                 output_path=None)
+    # # calculate mean brightness
+    # brightness = np.mean(cropped)
+
+
+    # # Define thresholds for overexposure and underexposure
+    # overexposed_threshold = 240  # Example threshold for overexposure
     underexposed_threshold = 50  # Example threshold for underexposure
     
-    if brightness > overexposed_threshold:
+    if np.max(cropped) == 255:
         return "overexposed"
-    elif brightness < underexposed_threshold:
+    elif np.max(cropped) < underexposed_threshold:
         return "underexposed"
     else:
         return "ok"
 # Core search function
-def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
+def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.12,100000)):
+    print("Starting adaptive search for camera", camera_id)
+    os.makedirs(output_dir, exist_ok=True)
+    print("output dir:", output_dir)
+    print("initial guess:", initial_tuple)
     min_shutter, max_shutter, step_shutter = int(999), int(1033e3), int(1e4)
-    min_again, max_again, step_again = 1.2, 8.1, 0.4
+    min_again, max_again, step_again = 1.12, 8.0, 0.4
     search_range_shutter = list(range(min_shutter, max_shutter, step_shutter))
     search_range_again = np.arange(min_again, max_again, step_again).round(1).tolist()
 
@@ -75,9 +152,9 @@ def adaptive_search_exposure(camera_id, output_dir, initial_tuple=(1.2,33000)):
             break
         else:
             os.remove(img_filename)
-            dir_change = "increase" if result == "underexposed" else "decrease"
-            new_range_again = update_range(search_range_again, current_ag, dir_change)
-            new_range_shutter = update_range(search_range_shutter, current_shutter, dir_change)
+            direction_change = "increase" if result == "underexposed" else "decrease"
+            new_range_again = update_range(search_range_again, current_ag, direction_change)
+            new_range_shutter = update_range(search_range_shutter, current_shutter, direction_change)
             
             # priority to shutter, then again
             for new_ag in reversed(new_range_again):

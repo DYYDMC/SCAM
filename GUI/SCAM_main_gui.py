@@ -38,7 +38,9 @@ HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CHESS_PATH = os.path.join(SCAM_PATH, "spherical")
 ROI_PATH = os.path.join(SCAM_PATH, "roi")
+POINT_SCAN_DATA_PATH = os.path.join(SCAM_PATH, "point_scan_data")
 PANO_DATA_PATH = os.path.join(SCAM_PATH, "pano_data")
+FULL_SCAM_PATH = os.path.join(SCAM_PATH, "full_scam")
 DATA_PATH = os.path.join(SCAM_PATH, "data")
 ONE_SCAM_DATA_PATH = os.path.join(SCAM_PATH, "one_scam_data")
 SCAN_DATA_PATH = os.path.join(SCAM_PATH, "scan") # point scan
@@ -122,14 +124,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "uv_gain": self.doubleSpinBox_uv_gain.value()
         }
         if hasattr(self,"cam_path") and self.cam_path is not None:
-            config["cam_path"] = self.cam_path
-            
+            config["cam_path"] = np.asarray(self.cam_path).tolist()
+        ## debug info
+        # for key in config.keys():
+        #     print(f'{key}: type: {type(config[key])}')
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=4)
         print(f"Configuration saved to {config_path}")
     def connect_signals(self):
         """Connect all UI buttons to their functions"""
-        
         # OneScan section
         self.btn_spec_scan.clicked.connect(self.on_spec_scan)
         self.btn_spec_move.clicked.connect(self.on_move_scan)
@@ -210,7 +213,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_move_scan(self):
         """Handle move to position and then scans"""
         try:
-            
             # read the currenet position
             self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
             
@@ -221,13 +223,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.stepper_controller.move_to(self.next_pan, self.next_tilt)
             
             # calculate the wait
-            delta_t = 0.3*(abs(self.next_tilt-self.current_tilt))+0.1*abs(self.next_pan-self.current_pan)
-            print(f'waiting {delta_t} second')
-            time.sleep(delta_t+1)
+            self.motor_wait()
             
             # reassign the current position
             self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-            
             # Then perform the scan
             self.on_spec_scan()
             
@@ -305,10 +304,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
         print(f'output_fname:{output_fname}')
         while os.path.exists(output_fname) is False:
+            # do not continue when the file is not created
             print(f"Waiting for Green image file to be created: {output_fname}")
-            time.sleep(1)
-        # wait for file to be fully written
-        time.sleep(5)  
         
         ## adjust shutter and gain based on the first uv_image and the first green_img
         raw_2d = cut_raw_black_lines(output_fname)
@@ -475,8 +472,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_start_full_scan(self):
         print("I AM HERE!! FULL SCAN!")
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        scan_save_path = os.path.join(FULL_SCAN_PATH, f"SCAN_{start_time}")
-        os.makedirs(scan_save_path, exist_ok=True)
+        full_scan_save_path = os.path.join(FULL_SCAN_PATH, f"FULL_SCAN_{start_time}")
+        os.makedirs(full_scan_save_path, exist_ok=True)
         """Start full spectral scan for scene reconstruction"""
         try:
             self.on_update_parameters()
@@ -485,117 +482,135 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.tilt_step = 1
             self.cam_path = self.calculate_pano_positions()
             # save the scan positions
-            np.savez(os.path.join(scan_save_path,'scan_positions.npz'),positions=self.cam_path)
+            np.savez(os.path.join(full_scan_save_path,'scan_positions.npz'),positions=self.cam_path)
             for idx, (pan, tilt) in enumerate(self.cam_path):
                 ## move motors
+                # where we are
                 self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+                # where we want to go
                 self.next_pan = pan
                 self.next_tilt = tilt
+                # move and wait
                 self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                 self.motor_wait()
                 print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
+                # adjust the integration time based on the previous scan result at the same tilt position
                 
-                # spectral scan
-                for _ in range(3): # max 3 iteration testing 
-                    measurement = self.spec_controller.scan(self.int_oneScan)
-                    peak = measurement["intensity"].max()
-                    
-                    if .25*16383 <= peak <= .75*16383: # linearity range for the STUV-100
-                        break
-                    factor = .5*16383 / peak
-
-                    # stability clamp
-                    factor = max(0.5, min(2.0, factor))
-                    new_int = int(self.int_oneScan * factor)
-                    new_int = max(1, min(6000, new_int)) # make sure new_int is between 1ms and 6second
-
-                    if new_int == self.int_oneScan:
-                        break
-                    self.int_oneScan = new_int
-                    
-                print(f'Integration time: {self.int_oneScan} ms')
+                self.int_oneScan = self.adjust_int_t(self.int_oneScan)
 
                 result_ = self.spec_controller.scan(self.int_oneScan)
                 result_['motor_pan'] = pan
                 result_['motor_tilt'] = tilt
                 result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
 
-                np.save(os.path.join(scan_save_path, f"full_scan_{idx}"), result_)
+                np.save(os.path.join(full_scan_save_path, f"full_scan_{idx}_{pan}_{tilt}"), result_)
                 time.sleep(self.isi_oneScan)
         except Exception as e:
             print(f"Error during full scan: {str(e)}")
+    
+    def adjust_int_t(self,int_t,num_max_adjust=3,min_ADC=0.25*16383,max_ADC=0.75*16383,target_ADC=0.5*16383):
+        for _ in range(num_max_adjust):
+            measurement = self.spec_controller.scan(int_t)
+            peak = measurement["intensity"].max()
+            if min_ADC <= peak <= max_ADC: # linearity range for the STUV-100
+                break
+            factor = target_ADC / peak
+            
+            # stability clamp
+            factor = max(0.5, min(20.0, factor))
+            new_int = int(int_t * factor)
+            
+            new_int = max(1, min(5999, new_int)) # make sure new_int is between 0.156microsec and 600ms
+            print(" int_t after adjustment:", new_int)
+            if new_int == int_t:
+                break
+            int_t = new_int
+        
+        return int_t
         
     def on_start_point_scan(self):
+        """
+        Start a point scan by capturing spectral data at specific positions.
+        
+        This method moves the stepper motors to predefined positions for sky and ground scans,
+        captures preview images, and performs spectral scans at each position. The data is saved
+        to the appropriate directories for further analysis.
+        """
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        scan_save_path = os.path.join(SCAN_DATA_PATH, f"SCAN_{start_time}")
-        os.makedirs(scan_save_path, exist_ok=True)
+        point_scan_save_path = os.path.join(POINT_SCAN_DATA_PATH, f"POINT_SCAN_{start_time}")
+        sky_save_path = os.path.join(point_scan_save_path, f"sky_scan")
+        ground_save_path = os.path.join(point_scan_save_path, f"ground_scan")
+        loc_save_dict = {'sky':sky_save_path,'ground':ground_save_path}
+        
+        os.makedirs(point_scan_save_path, exist_ok=True)
+        os.makedirs(sky_save_path, exist_ok=True)
+        os.makedirs(ground_save_path, exist_ok=True)
         """Start solely spectral scan"""
+        # with two photos preview
         # scan one visual angle in the sky -> one visual angle in the ground
         try:
             self.on_update_parameters()
-            print(f"Starting SCAN two positions:")
-            print(f"ground:{self.pan_oneScan},{self.tilt_min}),sky:({self.pan_oneScan},{self.pan_max})")
-            self.ground_int_scan = self.int_oneScan
-            self.sky_int_scan = self.int_oneScan
-            for tt in range(60*60//5):
-                pan = self.pan_oneScan
-                tilt = self.tilt_oneScan
-                self.stepper_controller.move_to(pan, tilt)
-                # time.sleep(self.isi_oneScan)  # wait for movement
-                # result_ground = self.spec_controller.scan(self.ground_int_scan)
-                # while np.max(result_ground['intensity'])/16000<0.5:
-                #     self.ground_int_scan = int(self.ground_int_scan*16000/np.max(result_ground['intensity']))
-                #     print('before update ground int time:',self.ground_int_scan)
-                #     self.ground_int_scan = (self.ground_int_scan//np.power(10,len(str(self.ground_int_scan)))+2)*np.power(10,len(str(self.ground_int_scan)))
-                #     if self.ground_int_scan>6000:
-                #         self.ground_int_scan=1000
-                #         result_ground = self.spec_controller.scan(self.ground_int_scan)
-                #         break
-                #     if self.ground_int_scan<1:
-                #         self.ground_int_scan=2
-                #         result_ground = self.spec_controller.scan(self.ground_int_scan)
-                #         break
-                #     print('updated ground int time:',self.ground_int_scan)
-                #     result_ground = self.spec_controller.scan(self.ground_int_scan)
-                # result_ground['motor_pan'] = pan
-                # result_ground['motor_tilt'] = tilt
-                # result_ground['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                # print(scan_save_path)
-                # data_filename = os.path.join(scan_save_path, f"ground_scan{tt}")
-                # print(data_filename)
-                # np.save(data_filename,result_ground)
-                # print(f'saved to{data_filename}')
+            sky_tilt=self.tilt_max
+            ground_tilt=self.tilt_min
+            pan = self.pan_oneScan
+            POINT_SCAN_INTERATION = 3
+            point_scan_config = {
+                "pan": pan,
+                "sky_tilt": sky_tilt,
+                "ground_tilt": ground_tilt,
+                "num_iteration": POINT_SCAN_INTERATION
+            }
+            # save before start
+            with open(os.path.join(point_scan_save_path,'point_scan_config.json'), 'w') as f:
+                json.dump(point_scan_config, f, indent=4)
+            
+            # ## take photo preview at the two positions before the scan
+            # for tt,tilt in enumerate([sky_tilt,ground_tilt]):
+            #     ## move the motors
+            #     self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+            #     self.next_pan = pan
+            #     self.next_tilt = tilt
                 
-                # tilt = self.tilt_max
-                # self.stepper_controller.move_to(pan, tilt)
-                # time.sleep(self.isi_oneScan)  # wait for movement
-                # result_sky = self.spec_controller.scan(self.int_oneScan)
-                # print('sky max:',np.max(result_sky['intensity']))
-                # while np.max(result_sky['intensity'])/16000<0.5:
-                #     self.sky_int_scan = int(self.sky_int_scan*16000/np.max(result_sky['intensity']))
-                #     self.sky_int_scan = (self.sky_int_scan//np.power(10,len(str(self.sky_int_scan)))+1)*np.power(10,len(str(self.sky_int_scan)))
-                #     print('updated sky int time:',self.sky_int_scan)
-                #     if self.sky_int_scan>6000:
-                #         self.sky_int_scan=1000
-                #         result_sky = self.spec_controller.scan(self.sky_int_scan)
-                #         break
-                #     if self.sky_int_scan<1:
-                #         self.sky_int_scan=2
-                #         result_sky = self.spec_controller.scan(self.sky_int_scan)
-                #         break
-                #     result_sky = self.spec_controller.scan(self.sky_int_scan)
-                result_sky = self.spec_controller.scan(self.sky_int_scan)
-                result_sky['motor_pan'] = pan
-                result_sky['motor_tilt'] = tilt
-                result_sky['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                data_filename = os.path.join(scan_save_path, f"sky_scan{tt}")
-                np.save(data_filename,result_sky)
-                time.sleep(self.isi_oneScan)
+            #     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+            #     self.motor_wait()
+            #     ## take a photo preivew
+            #     self.on_uv_shoot(point_scan_save_path,img_idx=tt,ground_mode=False)
+            #     self.on_green_shoot(point_scan_save_path,img_idx=tt,ground_mode=False)
+            #     # Remove all .raw and .json files under the defined path "point_scan_save_path" using glob
+            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.raw")):
+            #         os.remove(file_path)
+            #         print(f"Removed file: {file_path}")
+            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.json")):
+            #         os.remove(file_path)
+            #         print(f"Removed file: {file_path}")
                 
-                # scan
-                
+            print(f"Starting POINT SCAN:")
+            # init integration time for different tilts
+            int_t_dict = {
+                'sky': self.int_oneScan,
+                'ground': self.int_oneScan
+            }
+            for ii in range(POINT_SCAN_INTERATION): # max 3 iteration testing
+                for tt,key in zip([sky_tilt,ground_tilt],['sky','ground']):
+                    ## move the motors
+                    self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+                    self.next_pan = pan
+                    self.next_tilt = tt
+                    
+                    self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+                    self.motor_wait()
+                    
+                    # adjust integration time based on the previous scan result at the same tilt position
+                    int_t_dict[key] = self.adjust_int_t(int_t_dict[key])
+                    print('finished adjust_int_t(), now int_t for {} tilt is {}'.format(key,int_t_dict[key]))
+                    result_ = self.spec_controller.scan(int_t_dict[key])
+                    result_['motor_pan'] = pan
+                    result_['motor_tilt'] = tt
+                    result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
+                    np.save(os.path.join(loc_save_dict[key], f"{key}_scan_{ii}"), result_)
+                    time.sleep(self.isi_oneScan)
         except Exception as e:
-            print(f"Error during SCAN calibration: {str(e)}")
+            print(f"Error during POINT SCAN: {str(e)}")
         
     def on_start_pano(self):
         self.on_update_parameters()
@@ -635,7 +650,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Waiting for ISI: {self.isi}s before next position...")
         print("the full pano session completed.")
         
-    
     def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
         NUM_CAM = 80
@@ -710,21 +724,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
     def on_start_full_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        scam_data_path = os.path.join(DATA_PATH, f"SCAM_{start_time}")
-        os.makedirs(scam_data_path, exist_ok=True)
+        full_scam_data_path = os.path.join(FULL_SCAM_PATH, f"SCAM_{start_time}")
+        os.makedirs(full_scam_data_path, exist_ok=True)
         
-        cam0_data_path = os.path.join(scam_data_path, "cam0")
-        cam1_data_path = os.path.join(scam_data_path, "cam1")
-        scan_data_path = os.path.join(scam_data_path, "scan_data")
+        cam0_data_path = os.path.join(full_scam_data_path, "cam0")
+        cam1_data_path = os.path.join(full_scam_data_path, "cam1")
+        scan_data_path = os.path.join(full_scam_data_path, "scan_data")
         
         os.makedirs(cam0_data_path, exist_ok=True)
         os.makedirs(cam1_data_path, exist_ok=True)
         os.makedirs(scan_data_path, exist_ok=True)
         
-        print(f"Data will be saved to: {scam_data_path}")
+        print(f"Data will be saved to: {full_scam_data_path}")
         self.on_update_parameters()
         self.cam_path = self.calculate_pano_positions()
-        self.save_config(os.path.join(scam_data_path, "scam_config.json"))
+        self.save_config(os.path.join(full_scam_data_path, "scam_config.json"))
         print(f"Total positions to take CAM photos: {len(self.cam_path)}")
         
         # Iterate over all pan and tilt positions
@@ -753,8 +767,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 
                     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                     self.motor_wait()
-
-                    result = self.on_spec_scan()
+                    # adjust the integration time based on the previous scan result at the same tilt position
+                    self.int_oneScan = self.adjust_int_t(self.int_oneScan)
+                    
+                    result = self.spec_controller.scan(self.int_oneScan)
                     # print(f'max nm:{max_nm}')
                     if result:
                         #print("Scan successful, saving data...")
