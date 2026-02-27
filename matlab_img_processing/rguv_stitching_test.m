@@ -1,6 +1,9 @@
 %% load preprocessed images
-img0_full = imread('out1_rgb.tiff'); img0 = img0_full(100:end,50:end,:);
-img1_full = imread('out2_rgb.tiff'); img1 = img1_full(100:end,50:end,:);
+img0_full = imread('tilt_0_left.tiff'); % left
+img1_full = imread('tilt_0_right.tiff'); % right
+%% after visual inspection with imageViewer
+img0 = img0_full(20:1065,60:2676,:);
+img1 = img1_full(20:1065,36:2656,:);
 % Note: keep images as RGB (uint8 or uint16) to preserve color information.
 % Do NOT convert to grayscale here if you want to retain color in the panorama.
 
