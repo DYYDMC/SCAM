@@ -11,7 +11,7 @@ import json
 import re
 import shutil
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 
@@ -83,6 +83,7 @@ def main() -> int:
     used_cam_path = cam_path[:actual_count]
 
     tilt_counts = Counter(tilt for _, tilt in used_cam_path)
+    tilt_positions: dict[int, int] = defaultdict(int)
 
     action = shutil.move
     moved = 0
@@ -90,7 +91,12 @@ def main() -> int:
     for (rgb_idx, src), (_, tilt) in zip(rgb_files, used_cam_path):
         is_incomplete = tilt_counts[tilt] < expected_per_tilt
         tilt_folder = f"tilt_{tilt}{'_incomplete' if is_incomplete else ''}"
-        dest_dir = rgb_dir / tilt_folder
+        pos_in_tilt = tilt_positions[tilt]
+        split_idx = tilt_counts[tilt] // 2
+        side_folder = "left" if pos_in_tilt < split_idx else "right"
+        tilt_positions[tilt] += 1
+
+        dest_dir = rgb_dir / tilt_folder / side_folder
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f"RGB_{rgb_idx}.tiff"
         action(str(src), str(dest))
