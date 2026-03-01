@@ -20,8 +20,7 @@ img1 = imread(cam1Path);
 
 %% 1) Unprocessed
 figure('Name', 'Unprocessed');
-montage({img0, img1});
-title('unprocessed');
+show_two_with_labels(img0, img1, 'unprocessed');
 
 %% Load circle and square masks
 cam0Mask = load(fullfile(maskDir, 'cam0_mask.mat'));
@@ -43,8 +42,14 @@ imwrite(circleMasked0, fullfile(scriptDir, 'circle_masked_cam0.tiff'));
 imwrite(circleMasked1, fullfile(scriptDir, 'circle_masked_cam1.tiff'));
 
 figure('Name', 'Circle Masked');
-montage({circleMasked0, circleMasked1});
-title('cropped using the largest circle');
+show_two_with_labels(circleMasked0, circleMasked1, 'Circle\_masked\_images');
+
+%% 2.5) Overlay: circle + concentric square on circle-masked images
+overlay0 = make_mask_overlay(circleMasked0, circleMask0, squareMask0);
+overlay1 = make_mask_overlay(circleMasked1, circleMask1, squareMask1);
+
+figure('Name', 'Circle-Square Overlay');
+show_two_with_labels(overlay0, overlay1, 'Image superimposed w. masks');
 
 %% 3) Square mask + concentric square crop
 squareMasked0 = img0;
@@ -62,13 +67,12 @@ imwrite(squareCrop0, fullfile(scriptDir, 'square_masked_cam0.tiff'));
 imwrite(squareCrop1, fullfile(scriptDir, 'square_masked_cam1.tiff'));
 
 figure('Name', 'Square Crops');
-montage({squareCrop0, squareCrop1});
-title('concentric square crops');
+show_two_with_labels(squareCrop0, squareCrop1, 'Concentric square-masked crops');
 
 figure('Name', 'Square Crop Histograms');
 plot_paired_hist(squareCrop0, squareCrop1, ...
-    'imhist(square\_masked\_cam0)', ...
-    'imhist(square\_masked\_cam1)');
+    'SquareCrop\_green\_image', ...
+    'SquareCrop\_UV\_image');
 
 %% 4) adapthisteq on square crops
 adap0 = adapthisteq(squareCrop0);
@@ -78,13 +82,12 @@ imwrite(adap0, fullfile(scriptDir, 'adapthisteq_square_masked_cam0.tiff'));
 imwrite(adap1, fullfile(scriptDir, 'adapthisteq_square_masked_cam1.tiff'));
 
 figure('Name', 'Adapthisteq Square Crops');
-montage({adap0, adap1});
-title('adapthisteq on concentric square crops');
+show_two_with_labels(adap0, adap1, 'Adapthisteq() square-masked images');
 
 figure('Name', 'Adapthisteq Histograms');
 plot_paired_hist(adap0, adap1, ...
-    'imhist(adapthisteq\_square\_masked\_cam0)', ...
-    '');
+    'Adapthisteq\_Green\_image', ...
+    'Adapthisteq\_UV\_image');
 
 function plot_paired_hist(imgCam0, imgCam1, titleCam0, titleCam1)
 % Use same bins/ranges for both histograms so comparisons are meaningful.
@@ -108,4 +111,31 @@ xlabel('Intensity'); ylabel('Count');
 xlim([xMin xMax]); ylim([0 yMax]);
 
 linkaxes([ax1 ax2], 'xy');
+end
+
+function show_two_with_labels(imgCam0, imgCam1, mainTitleText)
+tiledlayout(1,2, 'Padding', 'compact', 'TileSpacing', 'compact');
+nexttile; imshow(imgCam0); title('Green\_image');
+nexttile; imshow(imgCam1); title('UV\_image');
+sgtitle(mainTitleText);
+end
+
+function outRgb = make_mask_overlay(baseImg, circleMask, squareMask)
+base = mat2gray(baseImg);
+outRgb = cat(3, base, base, base);
+
+% circle and square boundaries in white (thick + hard overlay)
+circleEdge = bwperim(circleMask);
+squareEdge = bwperim(squareMask);
+% Make boundaries thicker by increasing the dilation radius.
+% Change the '4' to a larger integer to get thicker edges (e.g., 8).
+dilateRadius = 8; % adjust this value to control thickness
+circleEdge = imdilate(circleEdge, strel('disk', dilateRadius, 0));
+squareEdge = imdilate(squareEdge, strel('disk', dilateRadius, 0));
+
+% Hard overwrite for maximum visibility.
+overlayEdge = circleEdge | squareEdge;
+outRgb(:,:,1) = max(outRgb(:,:,1), 1.0 * overlayEdge);
+outRgb(:,:,2) = max(outRgb(:,:,2), 1.0 * overlayEdge);
+outRgb(:,:,3) = max(outRgb(:,:,3), 1.0 * overlayEdge);
 end
