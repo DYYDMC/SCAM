@@ -3,6 +3,9 @@ spec_scan/2025*/
 cali/2025*/
 data/2025*/
 cam/2025*/
+trajectory_crop_gif_app/outputs/
+trajectory_crop_gif_app/dist/
+trajectory_crop_gif_app/build/
 # darknoise
 dark_noises/*.npz
 dark_noises/*.png
