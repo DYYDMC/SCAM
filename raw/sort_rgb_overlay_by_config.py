@@ -59,7 +59,6 @@ def main() -> int:
 
     pano_dir = Path(sys.argv[1]).expanduser().resolve()
     rgb_dir_name = "RGB_overlay"
-    move_files = "--move" in sys.argv[2:]
 
     config_path = pano_dir / "pano_config.json"
     rgb_dir = pano_dir / rgb_dir_name
@@ -85,8 +84,8 @@ def main() -> int:
 
     tilt_counts = Counter(tilt for _, tilt in used_cam_path)
 
-    action = shutil.move if move_files else shutil.copy2
-    copied = 0
+    action = shutil.move
+    moved = 0
 
     for (rgb_idx, src), (_, tilt) in zip(rgb_files, used_cam_path):
         is_incomplete = tilt_counts[tilt] < expected_per_tilt
@@ -95,15 +94,15 @@ def main() -> int:
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f"RGB_{rgb_idx}.tiff"
         action(str(src), str(dest))
-        copied += 1
+        moved += 1
 
     print(f"Pano dir: {pano_dir}")
     print(f"Config entries: {len(cam_path)}")
     print(f"RGB files used: {actual_count}")
     print(f"Expected pans per tilt: {expected_per_tilt}")
     print(f"Output base: {rgb_dir}")
-    print(f"Action: {'move' if move_files else 'copy'}")
-    print(f"Files processed: {copied}")
+    print("Action: move")
+    print(f"Files processed: {moved}")
     return 0
 
 
