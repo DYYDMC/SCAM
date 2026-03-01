@@ -38,6 +38,10 @@ def find_rgb_files(rgb_dir: Path) -> list[tuple[int, Path]]:
     for path in rgb_dir.rglob("*"):
         if not path.is_file():
             continue
+        # Ignore files already sorted into tilt folders to keep reruns stable.
+        rel_parts = path.relative_to(rgb_dir).parts
+        if rel_parts and rel_parts[0].startswith("tilt_"):
+            continue
         m = RGB_PATTERN.match(path.name)
         if m:
             matches.append((int(m.group(1)), path))
@@ -55,12 +59,10 @@ def main() -> int:
 
     pano_dir = Path(sys.argv[1]).expanduser().resolve()
     rgb_dir_name = "RGB_overlay"
-    output_dir_name = "RGB_overlay_auto"
     move_files = "--move" in sys.argv[2:]
 
     config_path = pano_dir / "pano_config.json"
     rgb_dir = pano_dir / rgb_dir_name
-    output_dir = pano_dir / output_dir_name
 
     if not pano_dir.is_dir():
         raise FileNotFoundError(f"Pano directory not found: {pano_dir}")
@@ -68,11 +70,6 @@ def main() -> int:
         raise FileNotFoundError(f"Missing config file: {config_path}")
     if not rgb_dir.is_dir():
         raise FileNotFoundError(f"Missing RGB directory: {rgb_dir}")
-    if output_dir.exists():
-        raise FileExistsError(
-            f"Output directory already exists: {output_dir}\n"
-            "Use a different --output-dir-name."
-        )
 
     cam_path = load_cam_path(config_path)
     rgb_files = find_rgb_files(rgb_dir)
@@ -87,7 +84,6 @@ def main() -> int:
     used_cam_path = cam_path[:actual_count]
 
     tilt_counts = Counter(tilt for _, tilt in used_cam_path)
-    output_dir.mkdir(parents=True, exist_ok=False)
 
     action = shutil.move if move_files else shutil.copy2
     copied = 0
@@ -95,7 +91,7 @@ def main() -> int:
     for (rgb_idx, src), (_, tilt) in zip(rgb_files, used_cam_path):
         is_incomplete = tilt_counts[tilt] < expected_per_tilt
         tilt_folder = f"tilt_{tilt}{'_incomplete' if is_incomplete else ''}"
-        dest_dir = output_dir / tilt_folder
+        dest_dir = rgb_dir / tilt_folder
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f"RGB_{rgb_idx}.tiff"
         action(str(src), str(dest))
@@ -105,7 +101,7 @@ def main() -> int:
     print(f"Config entries: {len(cam_path)}")
     print(f"RGB files used: {actual_count}")
     print(f"Expected pans per tilt: {expected_per_tilt}")
-    print(f"Output: {output_dir}")
+    print(f"Output base: {rgb_dir}")
     print(f"Action: {'move' if move_files else 'copy'}")
     print(f"Files processed: {copied}")
     return 0
