@@ -83,6 +83,8 @@ def extract_masked_mean(raw_chan,camera):
     if camera=='cam0':
         ROI_PATH= CAM0_ROI_NPY
     roi = np.load(ROI_PATH)
+    if camera == 'cam0':
+        roi = np.fliplr(roi)
     mean_ = raw_chan[roi==1].mean()
     return mean_
     
