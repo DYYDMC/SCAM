@@ -323,9 +323,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Unexpected simultaneous capture error: {e}")
         return None, None
     def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=False):
-        if output_path is None:
+        if output_path is None or output_path is False:
+            print('output path for green shoot is set to default GUI_CAM0')
             output_path = GUI_CAM0
-        
+        # print('output_path is not NONE',output_path)
         ## if this is the first green shoot
         if self.cam0_shutter00 is None and self.cam0_gain00 is None:
             # for the first green shoot, use the default shutter and gain from the UI
@@ -395,10 +396,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(5)  # wait for file to be fully written
             raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
             save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
+        print('in side on_green_shoot(), output_fname:', output_fname)
         return output_fname
                 
     def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=False):
-        if output_path is None:
+        if output_path is None or output_path is False:
             output_path = GUI_CAM1
         print('pressed UV shoot')
         """Handle green camera shoot"""
@@ -472,6 +474,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d = cut_raw_black_lines(output_fname2)
             raw_2d_B = extract_B_raw(raw_2d)
             self.cam1_mean2=extract_masked_mean(raw_2d_B,'cam1')
+        print('in side on_uv_shoot(), output_fname:', output_fname)
         return output_fname
             
     def on_both_shoot(self, green_output_path=None, uv_output_path=None, img_idx=0,
