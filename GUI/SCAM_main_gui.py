@@ -417,7 +417,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         while os.path.exists(output_fname) is False:
             print(f"Waiting for UV image file to be created: {output_fname}")
             time.sleep(1)
-        time.sleep(5)  # wait for file to be fully written
     
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_B = extract_B_raw(raw_2d)
@@ -466,8 +465,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 time.sleep(1)
             else:
                 raise TimeoutError(f"UV image not created in time: {output_fname}")
-
-            time.sleep(5)
             raw_2d = cut_raw_black_lines(output_fname)
             raw_2d_B = extract_B_raw(raw_2d)
             self.cam1_mean1 = extract_masked_mean(raw_2d_B, 'cam1')
