@@ -329,10 +329,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ## if this is the first green shoot
         if self.cam0_shutter00 is None and self.cam0_gain00 is None:
             # for the first green shoot, use the default shutter and gain from the UI
+            print('taking from UI input for the first green shoot')
             shutter0 = str(self.spinBox_green_shutter.value()) or "33"
             gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         else:
             # for the later green shoots, use the adjusted shutter and gain based on the first green shoot
+            print('taking from the adjusted shutter and gain based on the first green shoot for the later green shoots')
             shutter0 = self.cam0_shutter00
             gain0 = self.cam0_gain00
         print(f'taking a green photo with shutter {shutter0} and gain {gain0}')
@@ -470,7 +472,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Optional extra passes for pano: keep refining green exposure to match UV ROI mean.
         if iterative_green_match:
-            for _ in range(green_match_max_retry):
+            print('iterative green match enabled, checking green-UV mean ratio and adjusting if needed...')
+            for ii in range(green_match_max_retry):
+                print(f'adapting green gain_shutter for the {ii+1} time')
+                print(self.cam1_mean1,self.cam0_mean1,self.cam1_mean1/self.cam0_mean1)
                 if self.cam1_mean1 is None or self.cam0_mean1 is None or self.cam0_mean1 <= 0:
                     break
                 ratio = self.cam1_mean1 / self.cam0_mean1
