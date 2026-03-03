@@ -432,7 +432,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         TARGET_LOW = 4096 * 1.05
         TARGET_HIGH = 42000
         P99_MAX = 64500
-        SAT_FRAC_MAX = 0.01  # 1.0%
+        SAT_FRAC_MAX = 0.4  # 1.0%
 
         for _ in range(MAX_EXPO_RETRY):
             mean_ok = TARGET_LOW <= self.cam1_mean1 <= TARGET_HIGH
