@@ -383,45 +383,38 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f'taking a green photo with shutter {shutter0} and gain {gain0}')
         QApplication.processEvents()  # Update UI
         
-        final_shutter0 = shutter0
-        final_gain0 = gain0
-        ## take the first green image with the default or adjusted shutter and gain
-        output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
-        print(f'output_fname:{output_fname}')
-        while os.path.exists(output_fname) is False:
-            # do not continue when the file is not created
-            print(f"Waiting for Green image file to be created: {output_fname}")
-        
-        ## adjust shutter and gain based on the first uv_image and the first green_img
-        raw_2d = cut_raw_black_lines(output_fname)
-        raw_2d_G = extract_G_raw(raw_2d)
-        self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
-        
-        ## check if the first green image is underexposed or overexposed
-        if self.cam1_mean1 is not None:
-            change_factor1 = self.cam1_mean1/self.cam0_mean1 # target/measured
-        else:
-            change_factor1 = 1.0
-            
-        ## check if the change factor is within the acceptable range (0.95-1.05)
-        if change_factor1<.95 or change_factor1>1.05:
-            ## need adjustment
-            shutter00,gain00 = adjust_shutter_gain(float(shutter0),float(gain0), change_factor1)
-            
-            ## remove the first test-run green .raw and .json
-            os.remove(output_fname)
-            os.remove(output_fname.replace('.raw','.json'))
-            
-            # take a new green image with the adjusted shutter and gain
-            output_fname=self.call_libcamera_raw(0,shutter00,gain00,output_path,img_idx)
+        final_shutter0 = str(shutter0)
+        final_gain0 = str(gain0)
+        output_fname = None
+        raw_2d_G = None
+        MAX_GREEN_RETRY = 3
+        GREEN_TOL = 0.05
+
+        # Single bounded loop: adjust green exposure to match UV ROI mean.
+        for _ in range(MAX_GREEN_RETRY):
+            output_fname = self.call_libcamera_raw(0, final_shutter0, final_gain0, output_path, img_idx)
+            print(f'output_fname:{output_fname}')
             while os.path.exists(output_fname) is False:
-                print(f"Waiting for UV image file to be created: {output_fname}")
-                time.sleep(1)
-            time.sleep(5)  # wait for file to be fully written
-            raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
-            self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
-            final_shutter0 = shutter00
-            final_gain0 = gain00
+                print(f"Waiting for Green image file to be created: {output_fname}")
+
+            raw_2d = cut_raw_black_lines(output_fname)
+            raw_2d_G = extract_G_raw(raw_2d)
+            self.cam0_mean1 = extract_masked_mean(raw_2d_G, 'cam0')
+
+            if self.cam1_mean1 is None or self.cam0_mean1 is None or self.cam0_mean1 <= 0:
+                break
+            ratio = self.cam1_mean1 / self.cam0_mean1
+            if (1.0 - GREEN_TOL) <= ratio <= (1.0 + GREEN_TOL):
+                break
+
+            change_factor = max(0.7, min(1.4, float(ratio)))
+            next_shutter, next_gain = adjust_shutter_gain(float(final_shutter0), float(final_gain0), change_factor)
+            if str(next_shutter) == str(final_shutter0) and str(next_gain) == str(final_gain0):
+                break
+
+            # Intermediate frame is not final; remove before next retry.
+            self._remove_capture_pair(output_fname)
+            final_shutter0, final_gain0 = str(next_shutter), str(next_gain)
         ## store the first green img's shutter and gain for the later use in the ground mode
         self.cam0_shutter00 = str(final_shutter0); self.cam0_gain00 = str(final_gain0)
         if save_jpg:
@@ -518,8 +511,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return output_fname
             
     def on_both_shoot(self, green_output_path=None, uv_output_path=None, img_idx=0,
-                     replace_with_simultaneous=True, iterative_green_match=False,
-                     green_match_tol=0.05, green_match_max_retry=3):
+                     replace_with_simultaneous=True):
         """Handle both cameras shoot"""
         # Qt clicked(bool) can pass False into the first positional arg.
         if isinstance(green_output_path, bool):
@@ -539,24 +531,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # First pass: sequential captures to derive balanced exposure settings.
         uv_raw = self.on_uv_shoot(output_path=seq_uv_path, img_idx=img_idx, save_jpg=False)
         green_raw = self.on_green_shoot(output_path=seq_green_path, img_idx=img_idx, save_jpg=False)
-
-        # Optional extra passes for pano: keep refining green exposure to match UV ROI mean.
-        if iterative_green_match:
-            print('iterative green match enabled, checking green-UV mean ratio and adjusting if needed...')
-            for ii in range(green_match_max_retry):
-                print(f'adapting green gain_shutter for the {ii+1} time')
-                print(self.cam1_mean1,self.cam0_mean1,self.cam1_mean1/self.cam0_mean1)
-                if self.cam1_mean1 is None or self.cam0_mean1 is None or self.cam0_mean1 <= 0:
-                    break
-                ratio = self.cam1_mean1 / self.cam0_mean1
-                if (1.0 - green_match_tol) <= ratio <= (1.0 + green_match_tol):
-                    break
-
-                prev_green_raw = green_raw
-                green_raw = self.on_green_shoot(output_path=seq_green_path, img_idx=img_idx, save_jpg=False)
-                # Keep only the latest sequential green result.
-                if prev_green_raw and prev_green_raw != green_raw:
-                    self._remove_capture_pair(prev_green_raw)
 
         if not replace_with_simultaneous:
             return green_raw, uv_raw
@@ -801,10 +775,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.on_both_shoot(
                 green_output_path=cam0_data_path,
                 uv_output_path=cam1_data_path,
-                img_idx=idx,
-                iterative_green_match=True,
-                green_match_tol=0.05,
-                green_match_max_retry=3
+                img_idx=idx
             )
 
             print(f"Waiting for ISI: {self.isi}s before next position...")
