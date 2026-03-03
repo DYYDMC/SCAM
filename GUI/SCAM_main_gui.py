@@ -740,7 +740,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.next_tilt = tilt
             
             self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-            self.motor_wait()
+            if self.current_tilt == self.next_tilt:
+                # Fast path for same-tilt pano stepping; keep conservative wait for tilt changes.
+                pan_delta = abs(self.next_pan - self.current_pan)
+                time.sleep(max(0.35, 0.08 * pan_delta + 0.25))
+            else:
+                self.motor_wait()
             print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
         
             ## take photos with both cameras
