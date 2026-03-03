@@ -442,9 +442,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f'initial cam1_mean1: {self.cam1_mean1}')
         MAX_EXPO_RETRY = 3
         TARGET_LOW = 4096 * 1.05
-        TARGET_HIGH = 30000
-        P99_MAX = 61000
-        SAT_FRAC_MAX = 0.001  # 0.1%
+        TARGET_HIGH = 42000
+        P99_MAX = 64500
+        SAT_FRAC_MAX = 0.01  # 1.0%
 
         for _ in range(MAX_EXPO_RETRY):
             mean_ok = TARGET_LOW <= self.cam1_mean1 <= TARGET_HIGH
@@ -462,7 +462,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 p99_factor = P99_MAX / max(p99, 1.0)
                 sat_factor = SAT_FRAC_MAX / max(sat_frac, 1e-9)
                 # Prioritize clipping avoidance; keep a safety margin.
-                change_factor = min(p99_factor, sat_factor, 1.0) * 0.9
+                change_factor = min(p99_factor, sat_factor, 1.0) * 0.97
             elif self.cam1_mean1 < TARGET_LOW:
                 change_factor = TARGET_LOW / self.cam1_mean1
             else:
