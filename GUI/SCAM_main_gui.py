@@ -25,7 +25,6 @@ Ui_MainWindow, QtBaseClass = loadUiType('/home/ydeng/Github/SCAM/GUI/SCAM_gui.ui
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
-print(project_root)
 
 # load SCAN-related functions
 from spec_scan.spectrometer_controller import SpectrometerController
@@ -270,9 +269,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 else:
                     # small pacing delay reduces camera pipeline thrash between rapid calls
                     time.sleep(0.25)
-
-                print('the Subprocess call is:')
-                print(cmd)
                 result = subprocess.run(
                     cmd,
                     check=True,
@@ -280,14 +276,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     capture_output=True,
                     text=True
                 )
-                print('result:', result.stdout)
-                print(output_dir,camera_id,shutter,gain,img_idx)
                 for _ in range(10):
                     if os.path.exists(fname):
                         break
                     time.sleep(0.3)
-                print("returning call_libcamera_raw():", fname)
-                print(os.path.exists(fname))
                 if os.path.exists(fname):
                     return fname
                 print(f"Capture succeeded but output file not found yet: {fname}")
@@ -344,8 +336,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 str(uv_gain), str(uv_shutter), uv_output_dir,
                 str(img_idx)
             ]
-            print('the Subprocess simultaneous call is:')
-            print(cmd)
             result = subprocess.run(
                 cmd,
                 check=True,
@@ -353,7 +343,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 capture_output=True,
                 text=True
             )
-            print('result:', result.stdout)
             green_raw = f"{green_output_dir}/cam0_gain{green_gain}_{green_shutter}ms_{img_idx}.raw"
             uv_raw = f"{uv_output_dir}/cam1_gain{uv_gain}_{uv_shutter}ms_{img_idx}.raw"
             return green_raw, uv_raw
@@ -366,21 +355,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return None, None
     def on_green_shoot(self,output_path=None,img_idx=0,save_jpg=True):
         if output_path is None or output_path is False:
-            print('output path for green shoot is set to default GUI_CAM0')
             output_path = GUI_CAM0
-        # print('output_path is not NONE',output_path)
         ## if this is the first green shoot
         if self.cam0_shutter00 is None and self.cam0_gain00 is None:
-            # for the first green shoot, use the default shutter and gain from the UI
-            print('taking from UI input for the first green shoot')
             shutter0 = str(self.spinBox_green_shutter.value()) or "33"
             gain0 = str(self.doubleSpinBox_green_gain.value()) or "1.12"
         else:
-            # for the later green shoots, use the adjusted shutter and gain based on the first green shoot
-            print('taking from the adjusted shutter and gain based on the first green shoot for the later green shoots')
             shutter0 = self.cam0_shutter00
             gain0 = self.cam0_gain00
-        print(f'taking a green photo with shutter {shutter0} and gain {gain0}')
         QApplication.processEvents()  # Update UI
         
         final_shutter0 = str(shutter0)
@@ -393,7 +375,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Single bounded loop: adjust green exposure to match UV ROI mean.
         for _ in range(MAX_GREEN_RETRY):
             output_fname = self.call_libcamera_raw(0, final_shutter0, final_gain0, output_path, img_idx)
-            print(f'output_fname:{output_fname}')
             while os.path.exists(output_fname) is False:
                 print(f"Waiting for Green image file to be created: {output_fname}")
 
@@ -419,14 +400,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.cam0_shutter00 = str(final_shutter0); self.cam0_gain00 = str(final_gain0)
         if save_jpg:
             save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
-        
-        print('in side on_green_shoot(), output_fname:', output_fname)
         return output_fname
                 
     def on_uv_shoot(self,output_path=None,img_idx=0,save_jpg=True):
         if output_path is None or output_path is False:
             output_path = GUI_CAM1
-        print('pressed UV shoot')
         """Handle green camera shoot"""
         if self.shutter1 is None or self.gain1 is None:
             shutter1 = str(self.spinBox_uv_shutter.value()) or "33"
@@ -434,8 +412,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             shutter1 = self.shutter1
             gain1 = self.gain1
-        print(shutter1,gain1)
-        
         QApplication.processEvents()  # Update UI
         output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
         while os.path.exists(output_fname) is False:
@@ -504,10 +480,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
         self.shutter1 = shutter1;self.gain1 = gain1
         if save_jpg:
-            print('saving the first UV image with adjusted exposure as .jpg')
             save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
-
-        print('in side on_uv_shoot(), output_fname:', output_fname)
         return output_fname
             
     def on_both_shoot(self, green_output_path=None, uv_output_path=None, img_idx=0,
