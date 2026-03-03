@@ -289,6 +289,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         meta_file = raw_file.replace('.raw', '.json') if raw_file else None
         if meta_file and os.path.exists(meta_file):
             os.remove(meta_file)
+        if raw_file:
+            base = raw_file.replace('.raw', '')
+            for jpg_file in (f"{base}_G.jpg", f"{base}_B.jpg", f"{base}.jpg"):
+                if os.path.exists(jpg_file):
+                    os.remove(jpg_file)
+
+    def _save_jpg_from_raw(self, raw_file, camera_id):
+        if not raw_file or not os.path.exists(raw_file):
+            return
+        raw_2d = cut_raw_black_lines(raw_file)
+        if int(camera_id) == 0:
+            chan = extract_G_raw(raw_2d)
+            save_as_jpg(chan, raw_file.replace('.raw', '_G.jpg'))
+        else:
+            chan = extract_B_raw(raw_2d)
+            save_as_jpg(chan, raw_file.replace('.raw', '_B.jpg'))
 
     def call_libcamera_raw_pair(self, green_shutter, green_gain, green_output_dir,
                                 uv_shutter, uv_gain, uv_output_dir, img_idx):
@@ -321,7 +337,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Unexpected simultaneous capture error: {e}")
         return None, None
-    def on_green_shoot(self,output_path=None,img_idx=0):
+    def on_green_shoot(self,output_path=None,img_idx=0,save_jpg=True):
         if output_path is None or output_path is False:
             print('output path for green shoot is set to default GUI_CAM0')
             output_path = GUI_CAM0
@@ -381,12 +397,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             final_gain0 = gain00
         ## store the first green img's shutter and gain for the later use in the ground mode
         self.cam0_shutter00 = str(final_shutter0); self.cam0_gain00 = str(final_gain0)
-        save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
+        if save_jpg:
+            save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
         
         print('in side on_green_shoot(), output_fname:', output_fname)
         return output_fname
                 
-    def on_uv_shoot(self,output_path=None,img_idx=0):
+    def on_uv_shoot(self,output_path=None,img_idx=0,save_jpg=True):
         if output_path is None or output_path is False:
             output_path = GUI_CAM1
         print('pressed UV shoot')
@@ -445,8 +462,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(f"Exposure not converged after {MAX_EXPO_RETRY} retries, use last values.")
             
         self.shutter1 = shutter1;self.gain1 = gain1
-        print('saving the first UV image with adjusted exposure as .jpg')
-        save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
+        if save_jpg:
+            print('saving the first UV image with adjusted exposure as .jpg')
+            save_as_jpg(raw_2d_B,output_fname.replace('.raw','_B.jpg'))
 
         print('in side on_uv_shoot(), output_fname:', output_fname)
         return output_fname
@@ -467,8 +485,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             uv_output_path = GUI_CAM1
 
         # First pass: sequential captures to derive balanced exposure settings.
-        uv_raw = self.on_uv_shoot(output_path=uv_output_path, img_idx=img_idx)
-        green_raw = self.on_green_shoot(output_path=green_output_path, img_idx=img_idx)
+        uv_raw = self.on_uv_shoot(output_path=uv_output_path, img_idx=img_idx, save_jpg=False)
+        green_raw = self.on_green_shoot(output_path=green_output_path, img_idx=img_idx, save_jpg=False)
 
         # Optional extra passes for pano: keep refining green exposure to match UV ROI mean.
         if iterative_green_match:
@@ -483,7 +501,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     break
 
                 prev_green_raw = green_raw
-                green_raw = self.on_green_shoot(output_path=green_output_path, img_idx=img_idx)
+                green_raw = self.on_green_shoot(output_path=green_output_path, img_idx=img_idx, save_jpg=False)
                 # Keep only the latest sequential green result.
                 if prev_green_raw and prev_green_raw != green_raw:
                     self._remove_capture_pair(prev_green_raw)
@@ -508,9 +526,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if sim_green_raw and sim_uv_raw and os.path.exists(sim_green_raw) and os.path.exists(sim_uv_raw):
             self._remove_capture_pair(green_raw)
             self._remove_capture_pair(uv_raw)
+            self._save_jpg_from_raw(sim_green_raw, camera_id=0)
+            self._save_jpg_from_raw(sim_uv_raw, camera_id=1)
             print("Sequential pair replaced by simultaneous pair.")
             return sim_green_raw, sim_uv_raw
 
+        # Simultaneous call failed: keep sequential final pair and export jpg only for those final files.
+        self._save_jpg_from_raw(green_raw, camera_id=0)
+        self._save_jpg_from_raw(uv_raw, camera_id=1)
         print("Simultaneous replacement failed; keeping sequential captures.")
         return green_raw, uv_raw
         
