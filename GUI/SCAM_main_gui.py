@@ -32,6 +32,7 @@ from stepper.OS_end.steppers import StepperController
 from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain, save_as_jpg, extract_masked_mean
 from capture_service import CaptureService
 from exposure_controller import ExposureController
+from scan_workflows import ScanWorkflows
 
 # define paths/home/ydeng/Github/SCAM/matlab_roi_extraction
 HOME = os.path.expanduser("~")
@@ -83,6 +84,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.spec_controller = SpectrometerController()
         self.stepper_controller = StepperController()
         self.capture_service = CaptureService(os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'))
+        self.scan_workflows = ScanWorkflows(
+            point_scan_data_path=POINT_SCAN_DATA_PATH,
+            pano_data_path=PANO_DATA_PATH,
+            full_scam_path=FULL_SCAM_PATH,
+            one_scam_data_path=ONE_SCAM_DATA_PATH,
+            full_scan_path=FULL_SCAN_PATH,
+            spec_tilt_pos=SPEC_TILT_POS,
+        )
         
         # Replace QGraphicsView with matplotlib FigureCanvas
         self.spectrum_figure = Figure(figsize=(5, 3))
@@ -482,43 +491,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cam_path = [(pp,tt) for tt in self.tilt_positions for pp in self.pan_positions]
         return cam_path
     def on_start_full_scan(self):
-        print("I AM HERE!! FULL SCAN!")
-        start_time = time.strftime("%Y%m%d_%H%M%S")
-        full_scan_save_path = os.path.join(FULL_SCAN_PATH, f"FULL_SCAN_{start_time}")
-        os.makedirs(full_scan_save_path, exist_ok=True)
-        """Start full spectral scan for scene reconstruction"""
-        try:
-            self.on_update_parameters()
-            # hardcode pan/tilt step to 1 degree
-            self.pan_step = 1
-            self.tilt_step = 1
-            self.cam_path = self.calculate_pano_positions()
-            # save the scan positions
-            np.savez(os.path.join(full_scan_save_path,'scan_positions.npz'),positions=self.cam_path)
-            for idx, (pan, tilt) in enumerate(self.cam_path):
-                ## move motors
-                # where we are
-                self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-                # where we want to go
-                self.next_pan = pan
-                self.next_tilt = tilt
-                # move and wait
-                self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-                self.motor_wait()
-                print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
-                # adjust the integration time based on the previous scan result at the same tilt position
-                
-                self.int_oneScan = self.adjust_int_t(self.int_oneScan)
-
-                result_ = self.spec_controller.scan(self.int_oneScan)
-                result_['motor_pan'] = pan
-                result_['motor_tilt'] = tilt
-                result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-
-                np.save(os.path.join(full_scan_save_path, f"full_scan_{idx}_{pan}_{tilt}"), result_)
-                time.sleep(self.isi_oneScan)
-        except Exception as e:
-            print(f"Error during full scan: {str(e)}")
+        self.scan_workflows.start_full_scan(self)
     
     def adjust_int_t(self,int_t,num_max_adjust=3,min_ADC=0.25*16383,max_ADC=0.75*16383,target_ADC=0.5*16383):
         for _ in range(num_max_adjust):
@@ -541,291 +514,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return int_t
         
     def on_start_point_scan(self):
-        """
-        Start a point scan by capturing spectral data at specific positions.
-        
-        This method moves the stepper motors to predefined positions for sky and ground scans,
-        captures preview images, and performs spectral scans at each position. The data is saved
-        to the appropriate directories for further analysis.
-        """
-        start_time = time.strftime("%Y%m%d_%H%M%S")
-        point_scan_save_path = os.path.join(POINT_SCAN_DATA_PATH, f"POINT_SCAN_{start_time}")
-        sky_save_path = os.path.join(point_scan_save_path, f"sky_scan")
-        ground_save_path = os.path.join(point_scan_save_path, f"ground_scan")
-        loc_save_dict = {'sky':sky_save_path,'ground':ground_save_path}
-        
-        os.makedirs(point_scan_save_path, exist_ok=True)
-        os.makedirs(sky_save_path, exist_ok=True)
-        os.makedirs(ground_save_path, exist_ok=True)
-        """Start solely spectral scan"""
-        # with two photos preview
-        # scan one visual angle in the sky -> one visual angle in the ground
-        try:
-            self.on_update_parameters()
-            sky_tilt=self.tilt_max
-            ground_tilt=self.tilt_min
-            pan = self.pan_oneScan
-            POINT_SCAN_INTERATION = 3
-            point_scan_config = {
-                "pan": pan,
-                "sky_tilt": sky_tilt,
-                "ground_tilt": ground_tilt,
-                "num_iteration": POINT_SCAN_INTERATION
-            }
-            # save before start
-            with open(os.path.join(point_scan_save_path,'point_scan_config.json'), 'w') as f:
-                json.dump(point_scan_config, f, indent=4)
-            
-            # ## take photo preview at the two positions before the scan
-            # for tt,tilt in enumerate([sky_tilt,ground_tilt]):
-            #     ## move the motors
-            #     self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-            #     self.next_pan = pan
-            #     self.next_tilt = tilt
-                
-            #     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-            #     self.motor_wait()
-            #     ## take a photo preivew
-            #     self.on_uv_shoot(point_scan_save_path,img_idx=tt)
-            #     self.on_green_shoot(point_scan_save_path,img_idx=tt)
-            #     # Remove all .raw and .json files under the defined path "point_scan_save_path" using glob
-            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.raw")):
-            #         os.remove(file_path)
-            #         print(f"Removed file: {file_path}")
-            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.json")):
-            #         os.remove(file_path)
-            #         print(f"Removed file: {file_path}")
-                
-            print(f"Starting POINT SCAN:")
-            # init integration time for different tilts
-            int_t_dict = {
-                'sky': self.int_oneScan,
-                'ground': self.int_oneScan
-            }
-            for ii in range(POINT_SCAN_INTERATION): # max 3 iteration testing
-                for tt,key in zip([sky_tilt,ground_tilt],['sky','ground']):
-                    ## move the motors
-                    self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-                    self.next_pan = pan
-                    self.next_tilt = tt
-                    
-                    self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-                    self.motor_wait()
-                    
-                    # adjust integration time based on the previous scan result at the same tilt position
-                    int_t_dict[key] = self.adjust_int_t(int_t_dict[key])
-                    print('finished adjust_int_t(), now int_t for {} tilt is {}'.format(key,int_t_dict[key]))
-                    result_ = self.spec_controller.scan(int_t_dict[key])
-                    result_['motor_pan'] = pan
-                    result_['motor_tilt'] = tt
-                    result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                    np.save(os.path.join(loc_save_dict[key], f"{key}_scan_{ii}"), result_)
-                    time.sleep(self.isi_oneScan)
-        except Exception as e:
-            print(f"Error during POINT SCAN: {str(e)}")
+        self.scan_workflows.start_point_scan(self)
         
     def on_start_pano(self):
-        self.on_update_parameters()
-        
-        start_time = time.strftime("%Y%m%d_%H%M%S")
-        pano_data_path = os.path.join(PANO_DATA_PATH, f"PANO_{start_time}")
-        os.makedirs(pano_data_path, exist_ok=True)
-        
-        cam0_data_path = os.path.join(pano_data_path, "cam0")
-        cam1_data_path = os.path.join(pano_data_path, "cam1")
-        
-        os.makedirs(cam0_data_path, exist_ok=True)
-        os.makedirs(cam1_data_path, exist_ok=True)
-        
-        print(f"Starting PANO...")
-        self.cam_path = self.calculate_pano_positions()
-        self.save_config(os.path.join(pano_data_path, "pano_config.json"))
-        print(f"Total positions to take CAM photos: {len(self.cam_path)}")
-        RECALIBRATE_EVERY = 4
-        for idx, (pan, tilt) in enumerate(self.cam_path):
-            ## move the motors
-            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-            self.next_pan = pan
-            self.next_tilt = tilt
-            
-            self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-            if self.current_tilt == self.next_tilt:
-                # Fast path for same-tilt pano stepping; keep conservative wait for tilt changes.
-                pan_delta = abs(self.next_pan - self.current_pan)
-                time.sleep(max(0.35, 0.08 * pan_delta + 0.25))
-            else:
-                self.motor_wait()
-            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
-        
-            ## take photos with both cameras
-            # deactivate uv_for inside-test run
-            print(f"Taking pano (UV) photo no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            need_recalibrate = (
-                idx == 0 or
-                (idx % RECALIBRATE_EVERY == 0) or
-                self.cam0_shutter00 is None or self.cam0_gain00 is None or
-                self.shutter1 is None or self.gain1 is None
-            )
-            if need_recalibrate:
-                self.on_both_shoot(
-                    green_output_path=cam0_data_path,
-                    uv_output_path=cam1_data_path,
-                    img_idx=idx
-                )
-            else:
-                sim_green_raw, sim_uv_raw = self.call_libcamera_raw_pair(
-                    green_shutter=self.cam0_shutter00,
-                    green_gain=self.cam0_gain00,
-                    green_output_dir=cam0_data_path,
-                    uv_shutter=self.shutter1,
-                    uv_gain=self.gain1,
-                    uv_output_dir=cam1_data_path,
-                    img_idx=idx
-                )
-                if sim_green_raw and sim_uv_raw and os.path.exists(sim_green_raw) and os.path.exists(sim_uv_raw):
-                    self._save_jpg_from_raw(sim_green_raw, camera_id=0)
-                    self._save_jpg_from_raw(sim_uv_raw, camera_id=1)
-                else:
-                    # Fallback: recover with full sequential calibration + replacement.
-                    self.on_both_shoot(
-                        green_output_path=cam0_data_path,
-                        uv_output_path=cam1_data_path,
-                        img_idx=idx
-                    )
-
-            print(f"Waiting for ISI: {self.isi}s before next position...")
-        print("the full pano session completed.")
+        self.scan_workflows.start_pano(self)
         
     def on_start_point_scam(self):
-        # print("I AM HERE!! SCAM ONE POSITION!")
-        NUM_CAM = 80
-        NUM_SCAN_ITERATION = 3
-        start_time = time.strftime("%Y%m%d_%H%M%S")
-        scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"SCAM_{start_time}")
-        os.makedirs(scam_data_path, exist_ok=True)
-        
-        cam0_data_path = os.path.join(scam_data_path, "cam0")
-        cam1_data_path = os.path.join(scam_data_path, "cam1")
-        scan_data_path = os.path.join(scam_data_path, "scan_data")
-        
-        os.makedirs(cam0_data_path, exist_ok=True)
-        os.makedirs(cam1_data_path, exist_ok=True)
-        os.makedirs(scan_data_path, exist_ok=True)
-        
-        print(f"Data will be saved to: {scam_data_path}")
-        self.on_update_parameters()
-        self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-        self.next_pan = self.pan_oneScan
-        self.next_tilt = self.tilt_oneScan
-        
-        print(f"Taking CAM at Pan: {self.pan_oneScan}, Tilt: {self.tilt_oneScan}")
-        self.stepper_controller.move_to(self.pan_oneScan, self.tilt_oneScan)
-        self.motor_wait()
-        for cc in range(NUM_CAM):
-            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-            self.next_pan,self.next_tilt = self.pan_oneScan, self.tilt_oneScan
-            
-            self.stepper_controller.move_to(self.pan_oneScan, self.tilt_oneScan)
-            self.motor_wait()
-            
-            self.cam1_mean1 = None
-            print(f"Taking pano (UV) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
-            self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=cc)
-            for ii in range(NUM_SCAN_ITERATION):
-                for ss,tilt in enumerate(SPEC_TILT_POS):
-                    self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-                    self.next_pan,self.next_tilt = self.pan_oneScan, tilt
-                    
-                    # move to position
-                    self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-                    self.motor_wait()
-                    
-                    for _ in range(3): # max 3 iteration testing 
-                        measurement = self.spec_controller.scan(self.int_oneScan)
-                        peak = measurement["intensity"].max()
-                        
-                        if .25*16383 <= peak <= .75*16383: # linearity range for the STUV-100
-                            break
-                        factor = .5*16383 / peak
-
-                        # stability clamp
-                        factor = max(0.5, min(2.0, factor))
-                        new_int = int(self.int_oneScan * factor)
-                        new_int = max(1, min(6000, new_int)) # make sure new_int is between 1ms and 6second
-
-                        if new_int == self.int_oneScan:
-                            break
-                        self.int_oneScan = new_int
-                        
-                    print(f'Integration time: {self.int_oneScan} ms')
-
-                    result_ = self.spec_controller.scan(self.int_oneScan)
-                    result_['motor_pan'] = self.pan_oneScan
-                    result_['motor_tilt'] = tilt
-                    result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                    np.save(os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}"), result_)
+        self.scan_workflows.start_point_scam(self)
             
     
     def on_start_full_scam(self):
-        start_time = time.strftime("%Y%m%d_%H%M%S")
-        full_scam_data_path = os.path.join(FULL_SCAM_PATH, f"SCAM_{start_time}")
-        os.makedirs(full_scam_data_path, exist_ok=True)
-        
-        cam0_data_path = os.path.join(full_scam_data_path, "cam0")
-        cam1_data_path = os.path.join(full_scam_data_path, "cam1")
-        scan_data_path = os.path.join(full_scam_data_path, "scan_data")
-        
-        os.makedirs(cam0_data_path, exist_ok=True)
-        os.makedirs(cam1_data_path, exist_ok=True)
-        os.makedirs(scan_data_path, exist_ok=True)
-        
-        print(f"Data will be saved to: {full_scam_data_path}")
-        self.on_update_parameters()
-        self.cam_path = self.calculate_pano_positions()
-        self.save_config(os.path.join(full_scam_data_path, "scam_config.json"))
-        print(f"Total positions to take CAM photos: {len(self.cam_path)}")
-        
-        # Iterate over all pan and tilt positions
-        for idx, (pan, tilt) in enumerate(self.cam_path):
-            print(f"Moving to Pan: {pan}, Tilt: {tilt} ({idx+1}/{len(self.cam_path)})")
-            self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-            self.next_pan = pan
-            self.next_tilt = tilt
-            
-            self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-            self.motor_wait()
-            
-            print(f"Taking photo scan no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=idx)
-            print('finished simultaneous replacement photo pair')
-            
-            ## if SPEC_TILT_POS is defined, perform spectral scan at different tilt positions for the same pan position
-            if len(SPEC_TILT_POS)>0:
-                print("Performing spectral scan...")
-                for tilt_scan in SPEC_TILT_POS:
-                    self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-                    self.next_pan = pan
-                    self.next_tilt = tilt_scan
-                
-                    self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-                    self.motor_wait()
-                    # adjust the integration time based on the previous scan result at the same tilt position
-                    self.int_oneScan = self.adjust_int_t(self.int_oneScan)
-                    
-                    result = self.spec_controller.scan(self.int_oneScan)
-                    # print(f'max nm:{max_nm}')
-                    if result:
-                        #print("Scan successful, saving data...")
-                        # Save data logic here
-                        data_filename = os.path.join(scan_data_path, f"photo{idx}_scan_pan{pan}_tilt{tilt_scan}.npz")
-                        np.savez(data_filename, wavelength=result['wavelengths'], intensity=result['intensity'])
-                        #print(f"Data saved to {data_filename}")
-                    else:
-                        print(f"Scan failed at Pan: {pan}, Tilt: {tilt} - {result['error']}")
-                
-                    print(f"Waiting for ISI: {self.isi}s before next position...")
-                    time.sleep(self.isi)
-        print("the full SCAM session completed.")
+        self.scan_workflows.start_full_scam(self)
         
         
 if __name__ == '__main__':
