@@ -31,6 +31,7 @@ from spec_scan.spectrometer_controller import SpectrometerController
 from stepper.OS_end.steppers import StepperController
 from raw.raw_prepro import cut_raw_black_lines, extract_B_raw,extract_G_raw, adjust_shutter_gain, save_as_jpg, extract_masked_mean
 from capture_service import CaptureService
+from exposure_controller import ExposureController
 
 # define paths/home/ydeng/Github/SCAM/matlab_roi_extraction
 HOME = os.path.expanduser("~")
@@ -304,13 +305,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d_G = extract_G_raw(raw_2d)
             self.cam0_mean1 = extract_masked_mean(raw_2d_G, 'cam0')
 
-            if self.cam1_mean1 is None or self.cam0_mean1 is None or self.cam0_mean1 <= 0:
-                break
-            ratio = self.cam1_mean1 / self.cam0_mean1
-            if (1.0 - GREEN_TOL) <= ratio <= (1.0 + GREEN_TOL):
+            if ExposureController.green_in_tolerance(self.cam1_mean1, self.cam0_mean1, tol=GREEN_TOL):
                 break
 
-            change_factor = max(0.7, min(1.4, float(ratio)))
+            change_factor = ExposureController.green_change_factor(
+                self.cam1_mean1, self.cam0_mean1, min_factor=0.7, max_factor=1.4
+            )
             next_shutter, next_gain = adjust_shutter_gain(float(final_shutter0), float(final_gain0), change_factor)
             if str(next_shutter) == str(final_shutter0) and str(next_gain) == str(final_gain0):
                 break
@@ -343,10 +343,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_B = extract_B_raw(raw_2d)
-        self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
-        roi_vals = raw_2d_B[self.cam1_roi_mask].astype(np.float64)
-        p99 = np.percentile(roi_vals, 99.0)
-        sat_frac = (roi_vals >= 65500).mean()
+        self.cam1_mean1, p99, sat_frac = ExposureController.uv_metrics(raw_2d_B, self.cam1_roi_mask)
 
         print(f'initial cam1_mean1: {self.cam1_mean1}')
         MAX_EXPO_RETRY = 3
@@ -356,9 +353,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         SAT_FRAC_MAX = 0.4  # 1.0%
 
         for _ in range(MAX_EXPO_RETRY):
-            mean_ok = TARGET_LOW <= self.cam1_mean1 <= TARGET_HIGH
-            clip_ok = (p99 <= P99_MAX) and (sat_frac <= SAT_FRAC_MAX)
-            if mean_ok and clip_ok:
+            accepted, clip_ok = ExposureController.uv_accept(
+                self.cam1_mean1, p99, sat_frac, TARGET_LOW, TARGET_HIGH, P99_MAX, SAT_FRAC_MAX
+            )
+            if accepted:
                 break
             if self.cam1_mean1 is None or self.cam1_mean1 <= 0:
                 raise RuntimeError(f"Invalid cam1_mean1: {self.cam1_mean1}")
@@ -367,15 +365,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 os.remove(output_fname)
                 os.remove(output_fname.replace('.raw','.json'))
 
-            if not clip_ok:
-                p99_factor = P99_MAX / max(p99, 1.0)
-                sat_factor = SAT_FRAC_MAX / max(sat_frac, 1e-9)
-                # Prioritize clipping avoidance; keep a safety margin.
-                change_factor = min(p99_factor, sat_factor, 1.0) * 0.97
-            elif self.cam1_mean1 < TARGET_LOW:
-                change_factor = TARGET_LOW / self.cam1_mean1
-            else:
-                change_factor = TARGET_HIGH / self.cam1_mean1
+            change_factor = ExposureController.uv_change_factor(
+                self.cam1_mean1, p99, sat_frac, clip_ok,
+                TARGET_LOW, TARGET_HIGH, P99_MAX, SAT_FRAC_MAX, clip_safety=0.97
+            )
 
             shutter1, gain1 = adjust_shutter_gain(float(shutter1), float(gain1), change_factor)
             output_fname = self.call_libcamera_raw(1, shutter1, gain1, output_path, img_idx)
@@ -389,10 +382,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 raise TimeoutError(f"UV image not created in time: {output_fname}")
             raw_2d = cut_raw_black_lines(output_fname)
             raw_2d_B = extract_B_raw(raw_2d)
-            self.cam1_mean1 = extract_masked_mean(raw_2d_B, 'cam1')
-            roi_vals = raw_2d_B[self.cam1_roi_mask].astype(np.float64)
-            p99 = np.percentile(roi_vals, 99.0)
-            sat_frac = (roi_vals >= 65500).mean()
+            self.cam1_mean1, p99, sat_frac = ExposureController.uv_metrics(raw_2d_B, self.cam1_roi_mask)
             print(f'uv exposure check: mean={self.cam1_mean1:.1f}, p99={p99:.1f}, sat_frac={sat_frac:.5f}')
         else:
             print(f"Exposure not converged after {MAX_EXPO_RETRY} retries, use last values.")
