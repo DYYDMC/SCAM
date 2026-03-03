@@ -55,6 +55,7 @@ if [[ "$1" == "capture_raw" ]]; then
     libcamera-raw \
         --analoggain "${3}" \
         --shutter "${4}"ms \
+        --frames 1 \
         --config "$RAW_CONFIG_PATH" \
         --metadata "${5}/cam${2}_gain${3}_${4}ms_${6}.json" \
         --timeout "$TIMEOUT_MS" \
@@ -92,6 +93,7 @@ elif [[ "$1" == "capture_raw_pair" ]]; then
     libcamera-raw \
         --analoggain "${2}" \
         --shutter "${3}"ms \
+        --frames 1 \
         --config "$RAW_CONFIG_CAM0" \
         --metadata "${4}/cam0_gain${2}_${3}ms_${8}.json" \
         --timeout "$TIMEOUT_CAM0" \
@@ -101,6 +103,7 @@ elif [[ "$1" == "capture_raw_pair" ]]; then
     libcamera-raw \
         --analoggain "${5}" \
         --shutter "${6}"ms \
+        --frames 1 \
         --config "$RAW_CONFIG_CAM1" \
         --metadata "${7}/cam1_gain${5}_${6}ms_${8}.json" \
         --timeout "$TIMEOUT_CAM1" \
