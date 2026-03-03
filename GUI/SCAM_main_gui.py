@@ -355,7 +355,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(f"Unexpected simultaneous capture error: {e}")
         return None, None
-    def on_green_shoot(self,output_path=None,img_idx=0,save_jpg=True):
+    def on_green_shoot(self,output_path=None,img_idx=0,save_jpg=True,process_events=False):
         if output_path is None or output_path is False:
             output_path = GUI_CAM0
         ## if this is the first green shoot
@@ -365,7 +365,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             shutter0 = self.cam0_shutter00
             gain0 = self.cam0_gain00
-        QApplication.processEvents()  # Update UI
+        if process_events:
+            QApplication.processEvents()
         
         final_shutter0 = str(shutter0)
         final_gain0 = str(gain0)
@@ -404,7 +405,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
         return output_fname
                 
-    def on_uv_shoot(self,output_path=None,img_idx=0,save_jpg=True):
+    def on_uv_shoot(self,output_path=None,img_idx=0,save_jpg=True,process_events=False):
         if output_path is None or output_path is False:
             output_path = GUI_CAM1
         """Handle green camera shoot"""
@@ -414,7 +415,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             shutter1 = self.shutter1
             gain1 = self.gain1
-        QApplication.processEvents()  # Update UI
+        if process_events:
+            QApplication.processEvents()
         output_fname = self.call_libcamera_raw(1,shutter1,gain1,output_path,img_idx)
         while os.path.exists(output_fname) is False:
             print(f"Waiting for UV image file to be created: {output_fname}")
