@@ -434,14 +434,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_B = extract_B_raw(raw_2d)
         self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
-        
-        print(f'initial cam1_mean1: {self.cam1_mean1}:,{4096*1.05/self.cam1_mean1},{45000/self.cam1_mean1}')
-        MAX_EXPO_RETRY = 1
+        roi_cam1 = np.load(CAM1_ROI_NPY) == 1
+        roi_vals = raw_2d_B[roi_cam1].astype(np.float64)
+        p99 = np.percentile(roi_vals, 99.0)
+        sat_frac = (roi_vals >= 65500).mean()
+
+        print(f'initial cam1_mean1: {self.cam1_mean1}')
+        MAX_EXPO_RETRY = 3
         TARGET_LOW = 4096 * 1.05
-        TARGET_HIGH = 45000
+        TARGET_HIGH = 30000
+        P99_MAX = 61000
+        SAT_FRAC_MAX = 0.001  # 0.1%
 
         for _ in range(MAX_EXPO_RETRY):
-            if TARGET_LOW <= self.cam1_mean1 <= TARGET_HIGH:
+            mean_ok = TARGET_LOW <= self.cam1_mean1 <= TARGET_HIGH
+            clip_ok = (p99 <= P99_MAX) and (sat_frac <= SAT_FRAC_MAX)
+            if mean_ok and clip_ok:
                 break
             if self.cam1_mean1 is None or self.cam1_mean1 <= 0:
                 raise RuntimeError(f"Invalid cam1_mean1: {self.cam1_mean1}")
@@ -450,7 +458,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 os.remove(output_fname)
                 os.remove(output_fname.replace('.raw','.json'))
 
-            if self.cam1_mean1 < TARGET_LOW:
+            if not clip_ok:
+                p99_factor = P99_MAX / max(p99, 1.0)
+                sat_factor = SAT_FRAC_MAX / max(sat_frac, 1e-9)
+                # Prioritize clipping avoidance; keep a safety margin.
+                change_factor = min(p99_factor, sat_factor, 1.0) * 0.9
+            elif self.cam1_mean1 < TARGET_LOW:
                 change_factor = TARGET_LOW / self.cam1_mean1
             else:
                 change_factor = TARGET_HIGH / self.cam1_mean1
@@ -470,6 +483,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d = cut_raw_black_lines(output_fname)
             raw_2d_B = extract_B_raw(raw_2d)
             self.cam1_mean1 = extract_masked_mean(raw_2d_B, 'cam1')
+            roi_vals = raw_2d_B[roi_cam1].astype(np.float64)
+            p99 = np.percentile(roi_vals, 99.0)
+            sat_frac = (roi_vals >= 65500).mean()
+            print(f'uv exposure check: mean={self.cam1_mean1:.1f}, p99={p99:.1f}, sat_frac={sat_frac:.5f}')
         else:
             print(f"Exposure not converged after {MAX_EXPO_RETRY} retries, use last values.")
             
