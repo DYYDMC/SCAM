@@ -450,7 +450,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return output_fname
             
     def on_both_shoot(self, green_output_path=None, uv_output_path=None, img_idx=0,
-                     replace_with_simultaneous=True):
+                     replace_with_simultaneous=True, iterative_green_match=False,
+                     green_match_tol=0.05, green_match_max_retry=3):
         """Handle both cameras shoot"""
         # Qt clicked(bool) can pass False into the first positional arg.
         if isinstance(green_output_path, bool):
@@ -466,6 +467,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # First pass: sequential captures to derive balanced exposure settings.
         uv_raw = self.on_uv_shoot(output_path=uv_output_path, img_idx=img_idx)
         green_raw = self.on_green_shoot(output_path=green_output_path, img_idx=img_idx)
+
+        # Optional extra passes for pano: keep refining green exposure to match UV ROI mean.
+        if iterative_green_match:
+            for _ in range(green_match_max_retry):
+                if self.cam1_mean1 is None or self.cam0_mean1 is None or self.cam0_mean1 <= 0:
+                    break
+                ratio = self.cam1_mean1 / self.cam0_mean1
+                if (1.0 - green_match_tol) <= ratio <= (1.0 + green_match_tol):
+                    break
+
+                prev_green_raw = green_raw
+                green_raw = self.on_green_shoot(output_path=green_output_path, img_idx=img_idx)
+                # Keep only the latest sequential green result.
+                if prev_green_raw and prev_green_raw != green_raw:
+                    self._remove_capture_pair(prev_green_raw)
 
         if not replace_with_simultaneous:
             return green_raw, uv_raw
@@ -700,7 +716,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ## take photos with both cameras
             # deactivate uv_for inside-test run
             print(f"Taking pano (UV) photo no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=idx)
+            self.on_both_shoot(
+                green_output_path=cam0_data_path,
+                uv_output_path=cam1_data_path,
+                img_idx=idx,
+                iterative_green_match=True,
+                green_match_tol=0.05,
+                green_match_max_retry=3
+            )
 
             print(f"Waiting for ISI: {self.isi}s before next position...")
         print("the full pano session completed.")
