@@ -42,10 +42,13 @@ echo "imgid6?: $6"
 
 RAW_CONFIG_PATH="${BASE_DIR}/../energy/$( [[ "$2" == "0" ]] && echo "green" || echo "uv" )_raw_config.txt"
 
-TIMEOUT_MS=$(( $4 >= 500 ? 2000 : 1000 ))
+TIMEOUT_MS=$(( $4 + 1800 ))
+if (( TIMEOUT_MS < 2200 )); then
+    TIMEOUT_MS=2200
+fi
 
 if [[ "$1" == "capture_raw" ]]; then
-    if ! lsof /dev/video4 >/dev/null 2>&1; then
+    if lsof /dev/video4 >/dev/null 2>&1; then
         check_and_kill_libcamera
     fi
 
@@ -70,15 +73,21 @@ elif [[ "$1" == "capture_raw_pair" ]]; then
     #   $6  cam1 shutter (ms)
     #   $7  cam1 output dir
     #   $8  image index
-    if ! lsof /dev/video4 >/dev/null 2>&1; then
+    if lsof /dev/video4 >/dev/null 2>&1; then
         check_and_kill_libcamera
     fi
 
     RAW_CONFIG_CAM0="${BASE_DIR}/../energy/green_raw_config.txt"
     RAW_CONFIG_CAM1="${BASE_DIR}/../energy/uv_raw_config.txt"
 
-    TIMEOUT_CAM0=$(( $3 >= 500 ? 2000 : 1000 ))
-    TIMEOUT_CAM1=$(( $6 >= 500 ? 2000 : 1000 ))
+    TIMEOUT_CAM0=$(( $3 + 1800 ))
+    TIMEOUT_CAM1=$(( $6 + 1800 ))
+    if (( TIMEOUT_CAM0 < 2200 )); then
+        TIMEOUT_CAM0=2200
+    fi
+    if (( TIMEOUT_CAM1 < 2200 )); then
+        TIMEOUT_CAM1=2200
+    fi
 
     libcamera-raw \
         --analoggain "${2}" \

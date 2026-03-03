@@ -255,34 +255,47 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         event.accept()
         
     def call_libcamera_raw(self,camera_id,shutter,gain,output_dir,img_idx):
-        try:
-            # Use timeout to prevent hanging
-            print('the Subprocess call is:')
-            print(["/bin/bash", os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'), 'capture_raw', 
-                 str(camera_id), gain, shutter,output_dir,str(img_idx)])
-            result = subprocess.run(
-                ["/bin/bash", os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'), 'capture_raw', 
-                 str(camera_id), gain, shutter,output_dir,str(img_idx)],
-                check=True,
-                timeout=30,  # 30 second timeout
-                capture_output=True,
-                text=True
-            )
-            print('result:', result.stdout)
-            print(output_dir,camera_id,shutter,gain,img_idx)
-            fname = f"{output_dir}/cam{camera_id}_gain{gain}_{shutter}ms_{img_idx}.raw"
-            print("returning call_libcamera_raw():", fname)
-            print(os.path.exists(fname))
-            return fname
-        except subprocess.TimeoutExpired:
-            #self.status_label.setText("Photo capture timed out")
-            print(f"Photo capture timed out")
-        except subprocess.CalledProcessError as e:
-            #self.status_label.setText("Photo capture failed")
-            print(f"Error: {e.stderr}")
-        except Exception as e:
-            #self.status_label.setText("Unexpected error")
-            print(f"Unexpected error: {e}")
+        cmd = ["/bin/bash", os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'), 'capture_raw',
+               str(camera_id), str(gain), str(shutter), output_dir, str(img_idx)]
+        fname = f"{output_dir}/cam{camera_id}_gain{gain}_{shutter}ms_{img_idx}.raw"
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                if attempt > 1:
+                    backoff = 0.4 * attempt
+                    print(f"Retrying capture attempt {attempt}/{max_attempts} after {backoff:.1f}s backoff")
+                    time.sleep(backoff)
+                else:
+                    # small pacing delay reduces camera pipeline thrash between rapid calls
+                    time.sleep(0.25)
+
+                print('the Subprocess call is:')
+                print(cmd)
+                result = subprocess.run(
+                    cmd,
+                    check=True,
+                    timeout=35,
+                    capture_output=True,
+                    text=True
+                )
+                print('result:', result.stdout)
+                print(output_dir,camera_id,shutter,gain,img_idx)
+                for _ in range(10):
+                    if os.path.exists(fname):
+                        break
+                    time.sleep(0.3)
+                print("returning call_libcamera_raw():", fname)
+                print(os.path.exists(fname))
+                if os.path.exists(fname):
+                    return fname
+                print(f"Capture succeeded but output file not found yet: {fname}")
+            except subprocess.TimeoutExpired:
+                print("Photo capture timed out")
+            except subprocess.CalledProcessError as e:
+                print(f"Error: {e.stderr}")
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+        return fname
     def _remove_capture_pair(self, raw_file):
         if raw_file and os.path.exists(raw_file):
             os.remove(raw_file)
