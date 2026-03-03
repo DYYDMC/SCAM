@@ -103,6 +103,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ## initialize parameters
         self.cam0_shutter00 = None
         self.cam0_gain00 = None
+        self.shutter1 = None
+        self.gain1 = None
         self.cam1_mean1 =None
         
         self.connect_signals()
@@ -433,8 +435,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             output_path = GUI_CAM1
         print('pressed UV shoot')
         """Handle green camera shoot"""
-        shutter1 = str(self.spinBox_uv_shutter.value()) or "33"
-        gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
+        if self.shutter1 is None or self.gain1 is None:
+            shutter1 = str(self.spinBox_uv_shutter.value()) or "33"
+            gain1 = str(self.doubleSpinBox_uv_gain.value()) or "1.12"
+        else:
+            shutter1 = self.shutter1
+            gain1 = self.gain1
         print(shutter1,gain1)
         
         QApplication.processEvents()  # Update UI
