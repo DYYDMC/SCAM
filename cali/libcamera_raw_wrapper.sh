@@ -61,6 +61,52 @@ if [[ "$1" == "capture_raw" ]]; then
         echo "Error: libcamera-raw failed" >&2
         exit 1
     fi
+elif [[ "$1" == "capture_raw_pair" ]]; then
+    # Args:
+    #   $2  cam0 gain
+    #   $3  cam0 shutter (ms)
+    #   $4  cam0 output dir
+    #   $5  cam1 gain
+    #   $6  cam1 shutter (ms)
+    #   $7  cam1 output dir
+    #   $8  image index
+    if ! lsof /dev/video4 >/dev/null 2>&1; then
+        check_and_kill_libcamera
+    fi
+
+    RAW_CONFIG_CAM0="${BASE_DIR}/../energy/green_raw_config.txt"
+    RAW_CONFIG_CAM1="${BASE_DIR}/../energy/uv_raw_config.txt"
+
+    TIMEOUT_CAM0=$(( $3 >= 500 ? 2000 : 1000 ))
+    TIMEOUT_CAM1=$(( $6 >= 500 ? 2000 : 1000 ))
+
+    libcamera-raw \
+        --analoggain "${2}" \
+        --shutter "${3}"ms \
+        --config "$RAW_CONFIG_CAM0" \
+        --metadata "${4}/cam0_gain${2}_${3}ms_${8}.json" \
+        --timeout "$TIMEOUT_CAM0" \
+        -o "${4}/cam0_gain${2}_${3}ms_${8}.raw" &
+    PID_CAM0=$!
+
+    libcamera-raw \
+        --analoggain "${5}" \
+        --shutter "${6}"ms \
+        --config "$RAW_CONFIG_CAM1" \
+        --metadata "${7}/cam1_gain${5}_${6}ms_${8}.json" \
+        --timeout "$TIMEOUT_CAM1" \
+        -o "${7}/cam1_gain${5}_${6}ms_${8}.raw" &
+    PID_CAM1=$!
+
+    wait "$PID_CAM0"
+    STATUS_CAM0=$?
+    wait "$PID_CAM1"
+    STATUS_CAM1=$?
+
+    if [[ $STATUS_CAM0 -ne 0 || $STATUS_CAM1 -ne 0 ]]; then
+        echo "Error: simultaneous libcamera-raw capture failed (cam0=$STATUS_CAM0, cam1=$STATUS_CAM1)" >&2
+        exit 1
+    fi
 elif [[ -z "$1" ]]; then
     echo "Default capture"
 else

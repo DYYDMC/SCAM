@@ -284,8 +284,46 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             #self.status_label.setText("Unexpected error")
             print(f"Unexpected error: {e}")
+    def _remove_capture_pair(self, raw_file):
+        if raw_file and os.path.exists(raw_file):
+            os.remove(raw_file)
+        meta_file = raw_file.replace('.raw', '.json') if raw_file else None
+        if meta_file and os.path.exists(meta_file):
+            os.remove(meta_file)
+
+    def call_libcamera_raw_pair(self, green_shutter, green_gain, green_output_dir,
+                                uv_shutter, uv_gain, uv_output_dir, img_idx):
+        try:
+            cmd = [
+                "/bin/bash",
+                os.path.join(CALI_PATH, 'libcamera_raw_wrapper.sh'),
+                'capture_raw_pair',
+                str(green_gain), str(green_shutter), green_output_dir,
+                str(uv_gain), str(uv_shutter), uv_output_dir,
+                str(img_idx)
+            ]
+            print('the Subprocess simultaneous call is:')
+            print(cmd)
+            result = subprocess.run(
+                cmd,
+                check=True,
+                timeout=45,
+                capture_output=True,
+                text=True
+            )
+            print('result:', result.stdout)
+            green_raw = f"{green_output_dir}/cam0_gain{green_gain}_{green_shutter}ms_{img_idx}.raw"
+            uv_raw = f"{uv_output_dir}/cam1_gain{uv_gain}_{uv_shutter}ms_{img_idx}.raw"
+            return green_raw, uv_raw
+        except subprocess.TimeoutExpired:
+            print("Simultaneous photo capture timed out")
+        except subprocess.CalledProcessError as e:
+            print(f"Simultaneous capture failed: {e.stderr}")
+        except Exception as e:
+            print(f"Unexpected simultaneous capture error: {e}")
+        return None, None
     def on_green_shoot(self,output_path=None,img_idx=0,ground_mode=False):
-        if output_path is False:
+        if output_path is None:
             output_path = GUI_CAM0
         
         ## if this is the first green shoot
@@ -300,6 +338,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f'taking a green photo with shutter {shutter0} and gain {gain0}')
         QApplication.processEvents()  # Update UI
         
+        final_shutter0 = shutter0
+        final_gain0 = gain0
         ## take the first green image with the default or adjusted shutter and gain
         output_fname = self.call_libcamera_raw(0,shutter0,gain0,output_path,img_idx)
         print(f'output_fname:{output_fname}')
@@ -335,8 +375,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(5)  # wait for file to be fully written
             raw_2d= cut_raw_black_lines(output_fname);raw_2d_G = extract_G_raw(raw_2d)
             self.cam0_mean1 = extract_masked_mean(raw_2d_G,'cam0')
+            final_shutter0 = shutter00
+            final_gain0 = gain00
         ## store the first green img's shutter and gain for the later use in the ground mode
-        self.cam0_shutter00 = shutter0; self.cam0_gain00 = gain0
+        self.cam0_shutter00 = str(final_shutter0); self.cam0_gain00 = str(final_gain0)
         save_as_jpg(raw_2d_G,output_fname.replace('.raw','_G.jpg'))
         
         ## if ground_mode is True, take the second green image with the shutter and gain adjusted based on the second uv image
@@ -353,9 +395,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             time.sleep(5)  # wait for file to be fully written
             raw_2d= cut_raw_black_lines(output_fname2);raw_2d_G = extract_G_raw(raw_2d)
             save_as_jpg(raw_2d_G,output_fname2.replace('.raw','_G.jpg'))
+        return output_fname
                 
     def on_uv_shoot(self,output_path=None,img_idx=0,ground_mode=False):
-        if output_path is False:
+        if output_path is None:
             output_path = GUI_CAM1
         print('pressed UV shoot')
         """Handle green camera shoot"""
@@ -429,11 +472,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d = cut_raw_black_lines(output_fname2)
             raw_2d_B = extract_B_raw(raw_2d)
             self.cam1_mean2=extract_masked_mean(raw_2d_B,'cam1')
+        return output_fname
             
-    def on_both_shoot(self):
+    def on_both_shoot(self, green_output_path=None, uv_output_path=None, img_idx=0,
+                     ground_mode=False, replace_with_simultaneous=True):
         """Handle both cameras shoot"""
-        self.on_uv_shoot()
-        self.on_green_shoot()
+        if green_output_path is None:
+            green_output_path = GUI_CAM0
+        if uv_output_path is None:
+            uv_output_path = GUI_CAM1
+
+        # First pass: sequential captures to derive balanced exposure settings.
+        uv_raw = self.on_uv_shoot(output_path=uv_output_path, img_idx=img_idx, ground_mode=ground_mode)
+        green_raw = self.on_green_shoot(output_path=green_output_path, img_idx=img_idx, ground_mode=ground_mode)
+
+        if not replace_with_simultaneous or ground_mode:
+            return green_raw, uv_raw
+
+        green_shutter = getattr(self, "cam0_shutter00", str(self.spinBox_green_shutter.value()))
+        green_gain = getattr(self, "cam0_gain00", str(self.doubleSpinBox_green_gain.value()))
+        uv_shutter = getattr(self, "shutter1", str(self.spinBox_uv_shutter.value()))
+        uv_gain = getattr(self, "gain1", str(self.doubleSpinBox_uv_gain.value()))
+
+        sim_green_raw, sim_uv_raw = self.call_libcamera_raw_pair(
+            green_shutter=green_shutter,
+            green_gain=green_gain,
+            green_output_dir=green_output_path,
+            uv_shutter=uv_shutter,
+            uv_gain=uv_gain,
+            uv_output_dir=uv_output_path,
+            img_idx=img_idx
+        )
+        if sim_green_raw and sim_uv_raw and os.path.exists(sim_green_raw) and os.path.exists(sim_uv_raw):
+            self._remove_capture_pair(green_raw)
+            self._remove_capture_pair(uv_raw)
+            print("Sequential pair replaced by simultaneous pair.")
+            return sim_green_raw, sim_uv_raw
+
+        print("Simultaneous replacement failed; keeping sequential captures.")
+        return green_raw, uv_raw
         
     def on_update_parameters(self):
         """"Update parameters from UI"""
@@ -642,10 +719,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ## take photos with both cameras
             # deactivate uv_for inside-test run
             print(f"Taking pano (UV) photo no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_uv_shoot(cam1_data_path,img_idx=idx)
-            
-            print(f"Taking pano (GREEN) photo no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_green_shoot(cam0_data_path,img_idx=idx)
+            self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=idx)
 
             print(f"Waiting for ISI: {self.isi}s before next position...")
         print("the full pano session completed.")
@@ -684,9 +758,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             
             self.cam1_mean1 = None
             print(f"Taking pano (UV) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
-            self.on_uv_shoot(cam1_data_path,img_idx=cc,ground_mode=False)
-            print(f"Taking pano (GREEN) photo no.{cc+1}/{NUM_CAM} at Pan: {self.pan_oneScan}, Tilt: {self.pan_oneScan}")
-            self.on_green_shoot(cam0_data_path,img_idx=cc,ground_mode=False)
+            self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=cc, ground_mode=False)
             for ii in range(NUM_SCAN_ITERATION):
                 for ss,tilt in enumerate(SPEC_TILT_POS):
                     self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
@@ -752,10 +824,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.motor_wait()
             
             print(f"Taking photo scan no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_uv_shoot(output_path=cam1_data_path,img_idx=idx,ground_mode=False)
-            print('finished uv photo')
-            self.on_green_shoot(output_path=cam0_data_path,img_idx=idx,ground_mode=False)
-            print('finished green photo')
+            self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=idx, ground_mode=False)
+            print('finished simultaneous replacement photo pair')
             
             ## if SPEC_TILT_POS is defined, perform spectral scan at different tilt positions for the same pan position
             if len(SPEC_TILT_POS)>0:
