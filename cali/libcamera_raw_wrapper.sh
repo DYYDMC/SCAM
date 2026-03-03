@@ -33,12 +33,23 @@ check_and_kill_libcamera() {
 }
 
 # Main execution logic
-echo "capture raw1?: $1"
-echo "camera id2?: $2"
-echo "gain3?: $3"
-echo "shutterms4?: $4"
-echo "outputdir5?: $5"
-echo "imgid6?: $6"
+if [[ "$1" == "capture_raw" ]]; then
+    echo "mode1?: $1"
+    echo "camera_id2?: $2"
+    echo "gain3?: $3"
+    echo "shutterms4?: $4"
+    echo "outputdir5?: $5"
+    echo "imgid6?: $6"
+elif [[ "$1" == "capture_raw_pair" ]]; then
+    echo "mode1?: $1"
+    echo "cam0_gain2?: $2"
+    echo "cam0_shutterms3?: $3"
+    echo "cam0_outputdir4?: $4"
+    echo "cam1_gain5?: $5"
+    echo "cam1_shutterms6?: $6"
+    echo "cam1_outputdir7?: $7"
+    echo "imgid8?: $8"
+fi
 
 RAW_CONFIG_PATH="${BASE_DIR}/../energy/$( [[ "$2" == "0" ]] && echo "green" || echo "uv" )_raw_config.txt"
 
