@@ -732,6 +732,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.cam_path = self.calculate_pano_positions()
         self.save_config(os.path.join(pano_data_path, "pano_config.json"))
         print(f"Total positions to take CAM photos: {len(self.cam_path)}")
+        RECALIBRATE_EVERY = 4
         for idx, (pan, tilt) in enumerate(self.cam_path):
             ## move the motors
             self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
@@ -745,11 +746,38 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ## take photos with both cameras
             # deactivate uv_for inside-test run
             print(f"Taking pano (UV) photo no.{idx+1}/{len(self.cam_path)} at Pan: {pan}, Tilt: {tilt}")
-            self.on_both_shoot(
-                green_output_path=cam0_data_path,
-                uv_output_path=cam1_data_path,
-                img_idx=idx
+            need_recalibrate = (
+                idx == 0 or
+                (idx % RECALIBRATE_EVERY == 0) or
+                self.cam0_shutter00 is None or self.cam0_gain00 is None or
+                self.shutter1 is None or self.gain1 is None
             )
+            if need_recalibrate:
+                self.on_both_shoot(
+                    green_output_path=cam0_data_path,
+                    uv_output_path=cam1_data_path,
+                    img_idx=idx
+                )
+            else:
+                sim_green_raw, sim_uv_raw = self.call_libcamera_raw_pair(
+                    green_shutter=self.cam0_shutter00,
+                    green_gain=self.cam0_gain00,
+                    green_output_dir=cam0_data_path,
+                    uv_shutter=self.shutter1,
+                    uv_gain=self.gain1,
+                    uv_output_dir=cam1_data_path,
+                    img_idx=idx
+                )
+                if sim_green_raw and sim_uv_raw and os.path.exists(sim_green_raw) and os.path.exists(sim_uv_raw):
+                    self._save_jpg_from_raw(sim_green_raw, camera_id=0)
+                    self._save_jpg_from_raw(sim_uv_raw, camera_id=1)
+                else:
+                    # Fallback: recover with full sequential calibration + replacement.
+                    self.on_both_shoot(
+                        green_output_path=cam0_data_path,
+                        uv_output_path=cam1_data_path,
+                        img_idx=idx
+                    )
 
             print(f"Waiting for ISI: {self.isi}s before next position...")
         print("the full pano session completed.")
