@@ -105,6 +105,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.shutter1 = None
         self.gain1 = None
         self.cam1_mean1 =None
+        self.cam0_roi_mask = np.load(CAM0_ROI_NPY) == 1
+        self.cam1_roi_mask = np.load(CAM1_ROI_NPY) == 1
         
         self.connect_signals()
     def save_config(self, config_path):
@@ -421,8 +423,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         raw_2d = cut_raw_black_lines(output_fname)
         raw_2d_B = extract_B_raw(raw_2d)
         self.cam1_mean1=extract_masked_mean(raw_2d_B,'cam1')
-        roi_cam1 = np.load(CAM1_ROI_NPY) == 1
-        roi_vals = raw_2d_B[roi_cam1].astype(np.float64)
+        roi_vals = raw_2d_B[self.cam1_roi_mask].astype(np.float64)
         p99 = np.percentile(roi_vals, 99.0)
         sat_frac = (roi_vals >= 65500).mean()
 
@@ -468,7 +469,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             raw_2d = cut_raw_black_lines(output_fname)
             raw_2d_B = extract_B_raw(raw_2d)
             self.cam1_mean1 = extract_masked_mean(raw_2d_B, 'cam1')
-            roi_vals = raw_2d_B[roi_cam1].astype(np.float64)
+            roi_vals = raw_2d_B[self.cam1_roi_mask].astype(np.float64)
             p99 = np.percentile(roi_vals, 99.0)
             sat_frac = (roi_vals >= 65500).mean()
             print(f'uv exposure check: mean={self.cam1_mean1:.1f}, p99={p99:.1f}, sat_frac={sat_frac:.5f}')
