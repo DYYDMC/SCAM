@@ -480,6 +480,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_both_shoot(self, green_output_path=None, uv_output_path=None, img_idx=0,
                      ground_mode=False, replace_with_simultaneous=True):
         """Handle both cameras shoot"""
+        # Qt clicked(bool) can pass False into the first positional arg.
+        if isinstance(green_output_path, bool):
+            green_output_path = None
+        if isinstance(uv_output_path, bool):
+            uv_output_path = None
+
         if green_output_path is None:
             green_output_path = GUI_CAM0
         if uv_output_path is None:
