@@ -792,11 +792,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
     def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
-        NUM_CAM = 80
-        NUM_SCAN_ITERATION = 3
+        NUM_CAM = 40
+        NUM_SCAN_ITERATION = 10*(len(SPEC_TILT_POS)+1)
         RECALIBRATE_EVERY = 4
         start_time = time.strftime("%Y%m%d_%H%M%S")
-        scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"SCAM_{start_time}")
+        scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"ONE_SCAM_{start_time}")
         os.makedirs(scam_data_path, exist_ok=True)
         
         cam0_data_path = os.path.join(scam_data_path, "cam0")
