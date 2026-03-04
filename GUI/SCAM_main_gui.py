@@ -818,6 +818,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.motor_wait()
         # init integration time for different tilts
         int_t_dict = {tilt: self.int_oneScan for tilt in SPEC_TILT_POS}
+        # init per-tilt warm-start exposure states for UV and green
+        uv_exp_dict = {tilt: (self.shutter1, self.gain1) for tilt in SPEC_TILT_POS}
+        green_exp_dict = {tilt: (self.cam0_shutter00, self.cam0_gain00) for tilt in SPEC_TILT_POS}
         
         ## start the loop of taking photos and spectra at the same position, to test the stability of the system and the repeatability of the measurement
         for cc in range(NUM_CAM):
@@ -862,12 +865,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                     # For the first spectral iteration only, take one UV+green pair at each tilt.
                     if ii == 0:
+                        # Warm start by tilt-specific exposure memory (same idea as int_t_dict).
+                        uv_shutter, uv_gain = uv_exp_dict.get(tilt, (None, None))
+                        green_shutter, green_gain = green_exp_dict.get(tilt, (None, None))
+                        if uv_shutter is not None and uv_gain is not None:
+                            self.shutter1, self.gain1 = uv_shutter, uv_gain
+                        if green_shutter is not None and green_gain is not None:
+                            self.cam0_shutter00, self.cam0_gain00 = green_shutter, green_gain
+
                         photo_idx = f"{cc}_{ii}_tilt{tilt}"
                         self.on_both_shoot(
                             green_output_path=cam0_data_path,
                             uv_output_path=cam1_data_path,
                             img_idx=photo_idx
                         )
+                        # Save updated exposure solution back to this tilt slot.
+                        uv_exp_dict[tilt] = (self.shutter1, self.gain1)
+                        green_exp_dict[tilt] = (self.cam0_shutter00, self.cam0_gain00)
                     
                     # adjust integration time based on the previous scan result at the same tilt position
                     int_t_dict[tilt] = self.adjust_int_t(int_t_dict[tilt])
