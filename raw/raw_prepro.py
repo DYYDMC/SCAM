@@ -7,16 +7,35 @@ SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 CAM0_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam0_mask.npy")
 CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 def cut_raw_black_lines(img_filename,stride=8128,height=3040,width=4056):
-    ## parse the bytes
-    ## take the H,W part only (the rest columns are black for ?
-    row_bytes = stride
-    frame_bytes = row_bytes * height
+    # Parse RAW bytes and robustly extract one frame even if:
+    # 1) file contains multiple concatenated frames, or
+    # 2) per-frame byte count differs slightly from nominal stride*height.
     with open(img_filename, 'rb') as f:
-        f.seek(0 * frame_bytes)
-        raw_frame = f.read(frame_bytes)
-    raw_data = np.frombuffer(raw_frame, dtype=np.uint16)
-    full_width = stride // 2  # since each pixel is 2 bytes
-    raw_2d_16bit = raw_data.reshape((height, full_width))[:, :width]
+        raw_bytes = f.read()
+    raw_data = np.frombuffer(raw_bytes, dtype=np.uint16)
+
+    nominal_full_width = stride // 2
+    nominal_frame_elems = height * nominal_full_width
+
+    # Fast path: one or more complete nominal frames -> keep last frame.
+    if raw_data.size >= nominal_frame_elems:
+        n_full_frames = raw_data.size // nominal_frame_elems
+        if n_full_frames >= 1:
+            start = (n_full_frames - 1) * nominal_frame_elems
+            frame = raw_data[start:start + nominal_frame_elems]
+            raw_2d_16bit = frame.reshape((height, nominal_full_width))[:, :width]
+            return raw_2d_16bit
+
+    # Fallback: infer row width from available data (handles slightly short frame).
+    inferred_full_width = raw_data.size // height
+    usable_elems = inferred_full_width * height
+    if inferred_full_width < width or usable_elems <= 0:
+        raise ValueError(
+            f"RAW frame too small or malformed: elems={raw_data.size}, "
+            f"inferred_full_width={inferred_full_width}, required_width={width}"
+        )
+    frame = raw_data[:usable_elems]
+    raw_2d_16bit = frame.reshape((height, inferred_full_width))[:, :width]
     return raw_2d_16bit
     
 def extract_B_raw(sensor_raw,height=3040,width=4056):
