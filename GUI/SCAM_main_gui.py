@@ -667,25 +667,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             with open(os.path.join(point_scan_save_path,'point_scan_config.json'), 'w') as f:
                 json.dump(point_scan_config, f, indent=4)
             
-            # ## take photo preview at the two positions before the scan
-            # for tt,tilt in enumerate([sky_tilt,ground_tilt]):
-            #     ## move the motors
-            #     self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
-            #     self.next_pan = pan
-            #     self.next_tilt = tilt
+            ## take photo preview at the two positions before the scan
+            for tt,tilt in enumerate([sky_tilt,ground_tilt]):
+                ## move the motors
+                self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+                self.next_pan = pan
+                self.next_tilt = tilt
                 
-            #     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
-            #     self.motor_wait()
-            #     ## take a photo preivew
-            #     self.on_uv_shoot(point_scan_save_path,img_idx=tt)
-            #     self.on_green_shoot(point_scan_save_path,img_idx=tt)
-            #     # Remove all .raw and .json files under the defined path "point_scan_save_path" using glob
-            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.raw")):
-            #         os.remove(file_path)
-            #         print(f"Removed file: {file_path}")
-            #     for file_path in glob.glob(os.path.join(point_scan_save_path, "*.json")):
-            #         os.remove(file_path)
-            #         print(f"Removed file: {file_path}")
+                self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+                self.motor_wait()
+                ## take a photo preivew
+                self.on_uv_shoot(point_scan_save_path,img_idx=tt)
+                self.on_green_shoot(point_scan_save_path,img_idx=tt)
+                # Remove all .raw and .json files under the defined path "point_scan_save_path" using glob
+                for file_path in glob.glob(os.path.join(point_scan_save_path, "*.raw")):
+                    os.remove(file_path)
+                    print(f"Removed file: {file_path}")
+                for file_path in glob.glob(os.path.join(point_scan_save_path, "*.json")):
+                    os.remove(file_path)
+                    print(f"Removed file: {file_path}")
                 
             print(f"Starting POINT SCAN:")
             # init integration time for different tilts
