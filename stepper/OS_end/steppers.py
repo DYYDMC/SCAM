@@ -2,6 +2,7 @@ import serial
 import serial.tools.list_ports
 import time
 import sys
+import re
 
 class SerialBase:
     def __init__(self, usb_hint=None):
@@ -61,6 +62,16 @@ class SerialBase:
 
 
 class StepperController(SerialBase):
+    @staticmethod
+    def _parse_position_response(response):
+        # Expected format example: "...|PAN:12|TILT:-3"
+        m = re.search(r"\|PAN:([+-]?\d+)\|TILT:([+-]?\d+)", response)
+        if not m:
+            raise ValueError(f"Malformed position response: {response!r}")
+        pan = int(m.group(1)) * -1
+        tilt = int(m.group(2)) * -1
+        return pan, tilt
+
     def move_to(self, target_pan=0,target_tilt=0):
         if not self.is_connected:
             if not self.initialize_connection():
@@ -77,23 +88,31 @@ class StepperController(SerialBase):
         except Exception as e:
             print("Serial read error:", str(e))
             raise
-    def read_pos(self,):
+    def read_pos(self, max_retries=4):
         if not self.is_connected:
             if not self.initialize_connection():
                 raise RuntimeError("Cannot move: connection failed.")
-        command = f"POSITION\n"
-        print(f"sending {command} over...")
-        self.ser.write(command.encode())
-
-        try:
-            response = self.ser.readline().decode().strip()
-            print("ESP32-stepper Serial Response:", response)
-            pan = int(response.split("|PAN:")[-1].split("|")[0])*-1
-            tilt = int(response.split("|TILT:")[-1])*-1
-            return pan,tilt
-        except Exception as e:
-            print("Serial read error:", str(e))
-            raise
+        last_err = None
+        for _ in range(max_retries):
+            command = "POSITION\n"
+            print(f"sending {command} over...")
+            try:
+                # Clear stale serial bytes from previous commands.
+                if hasattr(self.ser, "reset_input_buffer"):
+                    self.ser.reset_input_buffer()
+                self.ser.write(command.encode())
+                response = self.ser.readline().decode(errors="ignore").strip()
+                print("ESP32-stepper Serial Response:", response)
+                if not response:
+                    last_err = ValueError("Empty serial response")
+                    time.sleep(0.05)
+                    continue
+                return self._parse_position_response(response)
+            except Exception as e:
+                last_err = e
+                print("Serial read error:", str(e))
+                time.sleep(0.05)
+        raise RuntimeError(f"Failed to read valid POSITION response after {max_retries} retries: {last_err}")
     def home_motor(self,):
         if not self.is_connected:
             if not self.initialize_connection():
