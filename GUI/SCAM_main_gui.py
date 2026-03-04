@@ -873,7 +873,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         if green_shutter is not None and green_gain is not None:
                             self.cam0_shutter00, self.cam0_gain00 = green_shutter, green_gain
 
-                        photo_idx = f"{cc}_{ii}_tilt{tilt}"
+                        photo_idx = f"{cc}_tilt{tilt}"
                         self.on_both_shoot(
                             green_output_path=cam0_data_path,
                             uv_output_path=cam1_data_path,
