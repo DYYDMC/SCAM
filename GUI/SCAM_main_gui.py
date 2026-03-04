@@ -859,6 +859,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     # move to position
                     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                     self.motor_wait()
+
+                    # For the first spectral iteration only, take one UV+green pair at each tilt.
+                    if ii == 0:
+                        photo_idx = f"{cc}_{ii}_tilt{tilt}"
+                        self.on_both_shoot(
+                            green_output_path=cam0_data_path,
+                            uv_output_path=cam1_data_path,
+                            img_idx=photo_idx
+                        )
                     
                     # adjust integration time based on the previous scan result at the same tilt position
                     int_t_dict[tilt] = self.adjust_int_t(int_t_dict[tilt])
