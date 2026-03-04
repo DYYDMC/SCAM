@@ -58,9 +58,9 @@ CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 # SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
-#SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
+SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
 #SPEC_TILT_POS=[13,8,3,-2,-7] # when table is back against the wall(raining)
-SPEC_TILT_POS=[]
+# SPEC_TILT_POS=[]
 MIN_SHUTTER,MAX_SHUTTER,STEP_SHUTTER= int(999), int(1033e3), int(1e4)
 MIN_GAIN,MAX_GAIN,STEP_GAIN = 1.12, 8.0, 0.2
 SHUTTER_SEARCH_RANGE=list(range(MIN_SHUTTER, MAX_SHUTTER, STEP_SHUTTER))
@@ -816,6 +816,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f"Taking CAM at Pan: {self.pan_oneScan}, Tilt: {self.tilt_oneScan}")
         self.stepper_controller.move_to(self.pan_oneScan, self.tilt_oneScan)
         self.motor_wait()
+        # init integration time for different tilts
+        int_t_dict = {tilt: self.int_oneScan for tilt in SPEC_TILT_POS}
+        
+        ## start the loop of taking photos and spectra at the same position, to test the stability of the system and the repeatability of the measurement
         for cc in range(NUM_CAM):
             self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
             self.next_pan,self.next_tilt = self.pan_oneScan, self.tilt_oneScan
@@ -856,32 +860,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                     self.motor_wait()
                     
-                    for _ in range(3): # max 3 iteration testing 
-                        measurement = self.spec_controller.scan(self.int_oneScan)
-                        peak = measurement["intensity"].max()
-                        
-                        if .25*16383 <= peak <= .75*16383: # linearity range for the STUV-100
-                            break
-                        factor = .5*16383 / peak
-
-                        # stability clamp
-                        factor = max(0.5, min(2.0, factor))
-                        new_int = int(self.int_oneScan * factor)
-                        new_int = max(1, min(6000, new_int)) # make sure new_int is between 1ms and 6second
-
-                        if new_int == self.int_oneScan:
-                            break
-                        self.int_oneScan = new_int
-                        
-                    print(f'Integration time: {self.int_oneScan} ms')
-
-                    result_ = self.spec_controller.scan(self.int_oneScan)
+                    # adjust integration time based on the previous scan result at the same tilt position
+                    int_t_dict[tilt] = self.adjust_int_t(int_t_dict[tilt])
+                    print('finished adjust_int_t(), now int_t for {} tilt is {}'.format(tilt,int_t_dict[tilt]))
+                    
+                    # scan and save result
+                    result_ = self.spec_controller.scan(int_t_dict[tilt])
                     result_['motor_pan'] = self.pan_oneScan
                     result_['motor_tilt'] = tilt
                     result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
                     np.save(os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}"), result_)
-            
-    
     def on_start_full_scam(self):
         start_time = time.strftime("%Y%m%d_%H%M%S")
         full_scam_data_path = os.path.join(FULL_SCAM_PATH, f"SCAM_{start_time}")
