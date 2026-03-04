@@ -643,11 +643,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         point_scan_save_path = os.path.join(POINT_SCAN_DATA_PATH, f"POINT_SCAN_{start_time}")
         sky_save_path = os.path.join(point_scan_save_path, f"sky_scan")
         ground_save_path = os.path.join(point_scan_save_path, f"ground_scan")
+        preview_cam0_path = os.path.join(point_scan_save_path, "preview_cam0")
+        preview_cam1_path = os.path.join(point_scan_save_path, "preview_cam1")
         loc_save_dict = {'sky':sky_save_path,'ground':ground_save_path}
         
         os.makedirs(point_scan_save_path, exist_ok=True)
         os.makedirs(sky_save_path, exist_ok=True)
         os.makedirs(ground_save_path, exist_ok=True)
+        os.makedirs(preview_cam0_path, exist_ok=True)
+        os.makedirs(preview_cam1_path, exist_ok=True)
         """Start solely spectral scan"""
         # with two photos preview
         # scan one visual angle in the sky -> one visual angle in the ground
@@ -677,15 +681,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.stepper_controller.move_to(self.next_pan, self.next_tilt)
                 self.motor_wait()
                 ## take a photo preivew
-                self.on_uv_shoot(point_scan_save_path,img_idx=tt)
-                self.on_green_shoot(point_scan_save_path,img_idx=tt)
-                # Remove all .raw and .json files under the defined path "point_scan_save_path" using glob
-                for file_path in glob.glob(os.path.join(point_scan_save_path, "*.raw")):
-                    os.remove(file_path)
-                    print(f"Removed file: {file_path}")
-                for file_path in glob.glob(os.path.join(point_scan_save_path, "*.json")):
-                    os.remove(file_path)
-                    print(f"Removed file: {file_path}")
+                green_preview_raw, uv_preview_raw = self.on_both_shoot(
+                    green_output_path=preview_cam0_path,
+                    uv_output_path=preview_cam1_path,
+                    img_idx=tt
+                )
+                # Keep the point-scan preview behavior lightweight: remove temporary preview captures.
+                self._remove_capture_pair(green_preview_raw)
+                self._remove_capture_pair(uv_preview_raw)
                 
             print(f"Starting POINT SCAN:")
             # init integration time for different tilts
