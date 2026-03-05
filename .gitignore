@@ -11,7 +11,7 @@ dark_noises/*.png
 # cali
 *.npz
 *.json
-
+*.npy
 __pycache__/
 *.py[cod]
 *$py.class
