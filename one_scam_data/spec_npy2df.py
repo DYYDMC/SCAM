@@ -9,13 +9,9 @@ HOME = os.path.expanduser("~")
 SCAM_PATH = os.path.join(HOME, "Github", "SCAM")
 one_scan_path=os.path.join(SCAM_PATH, "one_scam_data")
 target_dir=str(sys.argv[1])
-# all_raws=glob.glob(os.path.join(target_folder,'*.raw'))
+
 print(target_dir)
-#print(os.path.join(one_scan_path,'SCAM*/'))
-# print(os.path.join(one_scan_path,'ONE_SCAM*/'))
-# target_dir = glob.glob(os.path.join(one_scan_path,'SCAM*/'))
-# target_dir = glob.glob(os.path.join(one_scan_path,'ONE_SCAM*/'))
-#for dir in target_dir:
+
 scan_dir=os.path.join(target_dir,'scan_data')
 print(f'turn all the npy files under {scan_dir} to a .pkl')
 all_npys = glob.glob(scan_dir + '/*.npy')
@@ -28,18 +24,23 @@ for npy_file in all_npys:
         'wavelength': scan_dict['wavelengths'],
         'spectrum': scan_dict['intensity'],
         'dark_corr':scan_dict['metadata']['dark_correction_applied'],
-        'int_t': scan_dict['metadata']['integration_time_ms'],
+        'int_t': np.uint32(scan_dict['metadata']['integration_time_ms']),
         'loc':(scan_dict['motor_pan'], scan_dict['motor_tilt']),
         'unix_ts': int(dt.timestamp()),
-        'year': dt.year,
-        'month': dt.month,
-        'day': dt.day,
-        'hour': dt.hour,
-        'minute': dt.minute,
-        'second': dt.second
+        'year': np.uint16(dt.year),
+        'month': np.uint8(dt.month),
+        'day': np.uint8(dt.day),
+        'hour': np.uint8(dt.hour),
+        'minute': np.uint8(dt.minute),
+        'second': np.uint8(dt.second)
     }
     data.append(row)
 df = pd.DataFrame(data)
-df.to_pickle(target_dir + 'scan_data.pkl')
+out_pkl = os.path.join(target_dir, 'scan_data2.pkl')
+
+df.to_pickle(out_pkl)
+
+print(f"saved: {out_pkl}")
+
         
         
