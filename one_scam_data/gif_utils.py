@@ -94,7 +94,7 @@ def generate_weighted_area_gif(
     fr: int = 30,
     titles: Iterable[str] | None = None,
 ) -> None:
-    """Generate GIF for filtered spectrum + opsin curves + filled weighted areas."""
+    """Generate GIF for filtered spectrum + filled weighted areas."""
     filtered = np.asarray(filtered, dtype=np.float64)
     wavelengths = np.asarray(wavelengths, dtype=np.float64)
     scone = np.asarray(scone, dtype=np.float64)
@@ -115,6 +115,10 @@ def generate_weighted_area_gif(
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
     y_top = float(np.nanmax(filtered) * 1.05) if np.isfinite(np.nanmax(filtered)) else None
+    s_area_all = filtered * scone[None, :]
+    m_area_all = filtered * mcone[None, :]
+    r_area_all = filtered * rod[None, :]
+    y2_top = float(np.nanmax(np.stack([s_area_all, m_area_all, r_area_all])) * 1.05)
 
     fig, ax1 = plt.subplots(figsize=(11, 6), dpi=120)
     line_filtered, = ax1.plot(wavelengths, filtered[0], color="black", linestyle="-", lw=2.0, label="Filtered spectrum")
@@ -126,10 +130,9 @@ def generate_weighted_area_gif(
         ax1.set_ylim(0, y_top)
 
     ax2 = ax1.twinx()
-    ax2.plot(wavelengths, scone, color="purple", linestyle="-", lw=1.2, alpha=0.95, label="S-cone sensitivity")
-    ax2.plot(wavelengths, mcone, color="lime", linestyle="-", lw=1.2, alpha=0.95, label="M-cone sensitivity")
-    ax2.plot(wavelengths, rod, color="green", linestyle="-", lw=1.2, alpha=0.95, label="Rod sensitivity")
-    ax2.set_ylabel("Relative sensitivity / weighted area")
+    ax2.set_ylabel("Weighted area")
+    # Keep y=0 at identical screen location on both axes.
+    ax2.set_ylim(0, y2_top if np.isfinite(y2_top) and y2_top > 0 else 1.0)
 
     s_fill = ax2.fill_between(wavelengths, 0, filtered[0] * scone, color="purple", alpha=0.22, label="Area: filtered × S-cone")
     m_fill = ax2.fill_between(wavelengths, 0, filtered[0] * mcone, color="lime", alpha=0.22, label="Area: filtered × M-cone")
