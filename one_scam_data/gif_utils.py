@@ -384,3 +384,114 @@ def generate_auc_timeseries_by_tilt_gifs(
         outputs.append(out)
 
     return outputs
+
+
+def generate_auc_timeseries_5tilt_gif(
+    auc_s: np.ndarray,
+    auc_m: np.ndarray,
+    auc_m_over_s: np.ndarray,
+    unix_ts: np.ndarray,
+    motor_tilt: np.ndarray,
+    output_path: str,
+    freq: int = 1,
+    fr: int = 30,
+) -> str:
+    """Generate one GIF with up to 5 tilt subplots (growing lines, fixed axes)."""
+    auc_s = np.asarray(auc_s, dtype=np.float64)
+    auc_m = np.asarray(auc_m, dtype=np.float64)
+    auc_m_over_s = np.asarray(auc_m_over_s, dtype=np.float64)
+    unix_ts = np.asarray(unix_ts, dtype=np.int64)
+    motor_tilt = np.asarray(motor_tilt)
+
+    n = len(auc_s)
+    if not (len(auc_m) == len(auc_m_over_s) == len(unix_ts) == len(motor_tilt) == n):
+        raise ValueError("All arrays must have the same length")
+
+    all_tilts = np.sort(np.unique(motor_tilt))[::-1][:5]
+    if len(all_tilts) == 0:
+        raise ValueError("No tilt data found")
+
+    per_tilt = []
+    max_frames = 0
+    global_auc_max = 0.0
+    global_ratio_max = 0.0
+    for tt in all_tilts:
+        mask = motor_tilt == tt
+        ts = unix_ts[mask]
+        s = auc_s[mask]
+        m = auc_m[mask]
+        r = auc_m_over_s[mask]
+        order = np.argsort(ts)
+        ts, s, m, r = ts[order], s[order], m[order], r[order]
+        if len(ts) < 2:
+            continue
+        dt = mdates.date2num([datetime.fromtimestamp(int(t)) for t in ts])
+        y_auc_max = float(np.nanmax(np.vstack([s, m])) * 1.1)
+        y_ratio_max = float(np.nanmax(r) * 1.1) if np.isfinite(np.nanmax(r)) else 1.0
+        if y_auc_max <= 0 or not np.isfinite(y_auc_max):
+            y_auc_max = 1.0
+        if y_ratio_max <= 0 or not np.isfinite(y_ratio_max):
+            y_ratio_max = 1.0
+        global_auc_max = max(global_auc_max, y_auc_max)
+        global_ratio_max = max(global_ratio_max, y_ratio_max)
+        per_tilt.append(
+            {
+                "tilt": int(tt),
+                "dt": dt,
+                "auc_s": s,
+                "auc_m": m,
+                "ratio": r,
+                "x_min": dt[0],
+                "x_max": dt[-1],
+            }
+        )
+        max_frames = max(max_frames, len(ts))
+
+    if not per_tilt:
+        raise ValueError("No tilt groups had at least 2 samples")
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    frame_indices = np.arange(0, max_frames, freq)
+
+    fig, axes = plt.subplots(len(per_tilt), 1, figsize=(12, 2.6 * len(per_tilt)), dpi=120, sharex=False)
+    if len(per_tilt) == 1:
+        axes = [axes]
+    fig.subplots_adjust(right=0.88, hspace=0.5)
+
+    with imageio.get_writer(output_path, mode="I", fps=fr) as writer:
+        for idx in frame_indices:
+            for ax in axes:
+                ax.clear()
+
+            for ax, d in zip(axes, per_tilt):
+                j = min(idx + 1, len(d["dt"]))
+                ax2 = ax.twinx()
+                ax.plot(d["dt"][:j], d["auc_s"][:j], color="purple", lw=1.6, label="S_auc")
+                ax.plot(d["dt"][:j], d["auc_m"][:j], color="lime", lw=1.6, label="M_auc")
+                ax2.plot(d["dt"][:j], d["ratio"][:j], color="black", lw=1.4, label="M_auc/S_auc")
+
+                ax.set_xlim(d["x_min"], d["x_max"])
+                ax.set_ylim(0, global_auc_max)
+                ax2.set_ylim(0, global_ratio_max)
+                ax.set_ylabel("AUC")
+                ax2.set_ylabel("M/S")
+                ax2.yaxis.set_label_position("right")
+                ax2.yaxis.tick_right()
+                ax.grid(alpha=0.2)
+                ax.set_title(f"Tilt {d['tilt']}")
+                ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M:%S"))
+                ax.tick_params(axis="x", rotation=20)
+
+            axes[-1].set_xlabel("Timestamp")
+            fig.suptitle("Time-series Build-up Across 5 Tilts", y=0.995)
+            fig.canvas.draw()
+            frame = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
+            writer.append_data(frame)
+
+    plt.close(fig)
+    print(f"GIF saved to {output_path}")
+    return output_path
+    if global_auc_max <= 0 or not np.isfinite(global_auc_max):
+        global_auc_max = 1.0
+    if global_ratio_max <= 0 or not np.isfinite(global_ratio_max):
+        global_ratio_max = 1.0
