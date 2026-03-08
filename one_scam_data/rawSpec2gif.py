@@ -62,8 +62,8 @@ def main() -> None:
         )
     )
     parser.add_argument("one_scam", help="ONE_SCAM_YYYYMMDD_HHMMSS folder name or full path")
-    parser.add_argument("--freq", type=int, default=1, help="Frame subsampling step")
-    parser.add_argument("--fr", type=int, default=30, help="Output gif fps")
+    parser.add_argument("--freq", type=int, default=30, help="Frame subsampling step")
+    parser.add_argument("--fr", type=int, default=15, help="Output gif fps")
     parser.add_argument("--intt", type=int, default=None, help="Only keep frames with this integration time (ms)")
     parser.add_argument(
         "--normalize-by-intt",
@@ -81,6 +81,11 @@ def main() -> None:
         type=float,
         default=5999.0,
         help="Max integration time in ms used by --norm-mode to_max",
+    )
+    parser.add_argument(
+        "--hide-intt-title",
+        action="store_true",
+        help="Hide integration time from frame titles (auto-enabled when normalization is on)",
     )
     args = parser.parse_args()
 
@@ -134,7 +139,11 @@ def main() -> None:
     if args.intt is not None:
         suffix += f"_intt-{int(args.intt)}"
 
-    titles = build_titles(unix_ts=unix_ts, int_t=int_t, n_frames=raw.shape[0])
+    # Keep title behavior consistent with normalization:
+    # normalized -> hide int_t, not normalized -> show int_t
+    hide_intt_title = args.normalize_by_intt or args.hide_intt_title
+    title_int_t = None if hide_intt_title else int_t
+    titles = build_titles(unix_ts=unix_ts, int_t=title_int_t, n_frames=raw.shape[0])
 
     out_raw = os.path.join(target_dir, f"raw_spectrum{suffix}.gif")
     out_filtered = os.path.join(target_dir, f"filtered_spectrum{suffix}.gif")
