@@ -3,6 +3,7 @@ import argparse
 import os
 from datetime import datetime
 
+import argcomplete
 import numpy as np
 
 from gif_utils import generate_gif
@@ -87,6 +88,7 @@ def main() -> None:
         action="store_true",
         help="Hide integration time from frame titles (auto-enabled when normalization is on)",
     )
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     target_dir = resolve_one_scam_path(args.one_scam)
