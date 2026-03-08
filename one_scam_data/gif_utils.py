@@ -345,7 +345,7 @@ def generate_auc_timeseries_by_tilt_gifs(
 
         fig, ax1 = plt.subplots(figsize=(11, 5), dpi=120)
         ax2 = ax1.twinx()
-        fig.subplots_adjust(right=0.78)
+        fig.subplots_adjust(right=0.72)
 
         with imageio.get_writer(out, mode="I", fps=fr) as writer:
             for idx in frame_indices:
@@ -373,7 +373,7 @@ def generate_auc_timeseries_by_tilt_gifs(
 
                 l1, lb1 = ax1.get_legend_handles_labels()
                 l2, lb2 = ax2.get_legend_handles_labels()
-                ax1.legend(l1 + l2, lb1 + lb2, loc="upper left", bbox_to_anchor=(1.01, 1.0), borderaxespad=0.0)
+                ax1.legend(l1 + l2, lb1 + lb2, loc="upper left", bbox_to_anchor=(1.14, 1.0), borderaxespad=0.0)
 
                 fig.canvas.draw()
                 frame = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
