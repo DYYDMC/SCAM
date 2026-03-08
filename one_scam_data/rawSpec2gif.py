@@ -9,6 +9,7 @@ import numpy as np
 
 from gif_utils import (
     generate_auc_summary_gif,
+    generate_auc_timeseries_5tilt_gif,
     generate_auc_timeseries_by_tilt_gifs,
     generate_gif,
     generate_weighted_area_gif,
@@ -201,6 +202,7 @@ def build_output_paths(target_dir: str, suffix: str) -> dict[str, str]:
         "filtered": os.path.join(target_dir, f"filtered_spectrum{suffix}.gif"),
         "weighted": os.path.join(target_dir, f"filtered_weighted_areas{suffix}.gif"),
         "auc_summary": os.path.join(target_dir, f"auc_summary_ratio{suffix}.gif"),
+        "auc_5tilt": os.path.join(target_dir, f"auc_timeseries_5tilt{suffix}.gif"),
         "out_dir": target_dir,
     }
 
@@ -311,6 +313,31 @@ def generate_tilt_timeseries_gifs(
     return expected
 
 
+def generate_5tilt_timeseries_gif(
+    data: dict[str, np.ndarray],
+    auc: dict[str, np.ndarray],
+    output_path: str,
+    freq: int,
+    fr: int,
+    overwrite: bool,
+) -> str:
+    if data["unix_ts"] is None:
+        raise KeyError("unix_ts is required to generate 5-tilt auc_timeseries GIF")
+    if os.path.exists(output_path) and not overwrite:
+        print(f"[skip] exists: {output_path}")
+        return output_path
+    return generate_auc_timeseries_5tilt_gif(
+        auc_s=auc["auc_s"],
+        auc_m=auc["auc_m"],
+        auc_m_over_s=auc["auc_m_over_s"],
+        unix_ts=data["unix_ts"],
+        motor_tilt=data["motor_tilt"],
+        output_path=output_path,
+        freq=freq,
+        fr=fr,
+    )
+
+
 def main() -> None:
     parser = build_parser()
     argcomplete.autocomplete(parser)
@@ -357,12 +384,21 @@ def main() -> None:
         fr=args.fr,
         overwrite=args.overwrite,
     )
+    out_5tilt = generate_5tilt_timeseries_gif(
+        data=data,
+        auc=auc,
+        output_path=outputs["auc_5tilt"],
+        freq=args.freq,
+        fr=args.fr,
+        overwrite=args.overwrite,
+    )
 
     print("Done:")
     print(outputs["raw"])
     print(outputs["filtered"])
     print(outputs["weighted"])
     print(outputs["auc_summary"])
+    print(out_5tilt)
     for p in tilt_outputs:
         print(p)
 
