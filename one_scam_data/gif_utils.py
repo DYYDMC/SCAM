@@ -2,11 +2,11 @@ import os
 from typing import Iterable
 
 import imageio.v2 as imageio
-import matplotlib
 import numpy as np
 
 os.environ["MPLCONFIGDIR"] = "/tmp/matplotlib"
 os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
+import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
