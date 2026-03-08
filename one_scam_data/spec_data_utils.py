@@ -132,6 +132,7 @@ def add_auc_metrics(df: pd.DataFrame) -> pd.DataFrame:
     out["auc_scone"] = np.trapezoid(filt_stack * kernels["scone"], x=x, axis=1)
     out["auc_mcone"] = np.trapezoid(filt_stack * kernels["mcone"], x=x, axis=1)
     out["auc_rod"] = np.trapezoid(filt_stack * kernels["rod"], x=x, axis=1)
+    out["auc_m_over_s"] = out["auc_mcone"] / out["auc_scone"].replace(0, np.nan)
     return out
 
 

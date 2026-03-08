@@ -1,5 +1,6 @@
 import os
 from typing import Iterable
+from datetime import datetime
 
 import imageio.v2 as imageio
 import numpy as np
@@ -9,6 +10,7 @@ os.makedirs(os.environ["MPLCONFIGDIR"], exist_ok=True)
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 def generate_gif(
@@ -214,3 +216,168 @@ def generate_auc_summary_gif(
 
     plt.close(fig)
     print(f"GIF saved to {output_path}")
+
+
+def generate_auc_timeseries_gif(
+    auc_s: np.ndarray,
+    auc_m: np.ndarray,
+    auc_m_over_s: np.ndarray,
+    unix_ts: np.ndarray,
+    output_path: str,
+    freq: int = 1,
+    fr: int = 30,
+) -> None:
+    """Generate cumulative time-series GIF for M_auc, S_auc and M_auc/S_auc."""
+    auc_s = np.asarray(auc_s, dtype=np.float64)
+    auc_m = np.asarray(auc_m, dtype=np.float64)
+    auc_m_over_s = np.asarray(auc_m_over_s, dtype=np.float64)
+    unix_ts = np.asarray(unix_ts, dtype=np.int64)
+
+    n = len(auc_s)
+    if not (len(auc_m) == len(auc_m_over_s) == len(unix_ts) == n):
+        raise ValueError("All time-series arrays must have the same length")
+
+    frame_indices = np.arange(0, n, freq)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+
+    dt = mdates.date2num([datetime.fromtimestamp(int(t)) for t in unix_ts])
+    y_auc_max = float(np.nanmax(np.vstack([auc_s, auc_m])) * 1.1)
+    y_ratio_max = float(np.nanmax(auc_m_over_s) * 1.1) if np.isfinite(np.nanmax(auc_m_over_s)) else 1.0
+    if y_auc_max <= 0 or not np.isfinite(y_auc_max):
+        y_auc_max = 1.0
+    if y_ratio_max <= 0 or not np.isfinite(y_ratio_max):
+        y_ratio_max = 1.0
+
+    fig, ax1 = plt.subplots(figsize=(11, 5), dpi=120)
+    ax2 = ax1.twinx()
+
+    with imageio.get_writer(output_path, mode="I", fps=fr) as writer:
+        for idx in frame_indices:
+            j = idx + 1
+            ax1.clear()
+            ax2.clear()
+
+            ax1.plot(dt[:j], auc_s[:j], color="purple", linestyle="-", lw=1.8, label="S_auc")
+            ax1.plot(dt[:j], auc_m[:j], color="lime", linestyle="-", lw=1.8, label="M_auc")
+            ax2.plot(dt[:j], auc_m_over_s[:j], color="black", linestyle="-", lw=1.6, label="M_auc/S_auc")
+
+            ax1.set_ylabel("AUC")
+            ax2.set_ylabel("M_auc / S_auc")
+            ax1.set_ylim(0, y_auc_max)
+            ax2.set_ylim(0, y_ratio_max)
+            ax1.grid(alpha=0.2)
+
+            ax1.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M:%S"))
+            ax1.set_xlabel("Timestamp")
+            fig.autofmt_xdate(rotation=20)
+            ax1.set_title("Time-series Build-up: M_auc, S_auc, and M_auc/S_auc")
+
+            l1, lb1 = ax1.get_legend_handles_labels()
+            l2, lb2 = ax2.get_legend_handles_labels()
+            ax1.legend(l1 + l2, lb1 + lb2, loc="upper left")
+
+            fig.canvas.draw()
+            frame = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
+            writer.append_data(frame)
+
+    plt.close(fig)
+    print(f"GIF saved to {output_path}")
+
+
+def generate_auc_timeseries_by_tilt_gifs(
+    auc_s: np.ndarray,
+    auc_m: np.ndarray,
+    auc_m_over_s: np.ndarray,
+    unix_ts: np.ndarray,
+    motor_tilt: np.ndarray,
+    output_dir: str,
+    suffix: str = "",
+    freq: int = 1,
+    fr: int = 30,
+) -> list[str]:
+    """Generate one cumulative (growing-line) AUC time-series GIF per tilt."""
+    auc_s = np.asarray(auc_s, dtype=np.float64)
+    auc_m = np.asarray(auc_m, dtype=np.float64)
+    auc_m_over_s = np.asarray(auc_m_over_s, dtype=np.float64)
+    unix_ts = np.asarray(unix_ts, dtype=np.int64)
+    motor_tilt = np.asarray(motor_tilt)
+
+    n = len(auc_s)
+    if not (len(auc_m) == len(auc_m_over_s) == len(unix_ts) == len(motor_tilt) == n):
+        raise ValueError("All arrays must have the same length")
+
+    os.makedirs(output_dir, exist_ok=True)
+    outputs: list[str] = []
+
+    all_tilts = np.unique(motor_tilt)
+    all_tilts = np.sort(all_tilts)[::-1]
+
+    for tt in all_tilts:
+        mask = motor_tilt == tt
+        if not np.any(mask):
+            continue
+
+        ts = unix_ts[mask]
+        s = auc_s[mask]
+        m = auc_m[mask]
+        r = auc_m_over_s[mask]
+
+        order = np.argsort(ts)
+        ts = ts[order]
+        s = s[order]
+        m = m[order]
+        r = r[order]
+
+        if len(ts) < 2:
+            continue
+
+        dt = mdates.date2num([datetime.fromtimestamp(int(t)) for t in ts])
+        x_min, x_max = dt[0], dt[-1]
+        y_auc_max = float(np.nanmax(np.vstack([s, m])) * 1.1)
+        y_ratio_max = float(np.nanmax(r) * 1.1) if np.isfinite(np.nanmax(r)) else 1.0
+        if y_auc_max <= 0 or not np.isfinite(y_auc_max):
+            y_auc_max = 1.0
+        if y_ratio_max <= 0 or not np.isfinite(y_ratio_max):
+            y_ratio_max = 1.0
+
+        frame_indices = np.arange(0, len(ts), freq)
+        out = os.path.join(output_dir, f"auc_timeseries_tilt_{int(tt)}{suffix}.gif")
+
+        fig, ax1 = plt.subplots(figsize=(11, 5), dpi=120)
+        ax2 = ax1.twinx()
+
+        with imageio.get_writer(out, mode="I", fps=fr) as writer:
+            for idx in frame_indices:
+                j = idx + 1
+                ax1.clear()
+                ax2.clear()
+
+                # Growing lines on fixed full-length axes.
+                ax1.plot(dt[:j], s[:j], color="purple", linestyle="-", lw=1.8, label="S_auc")
+                ax1.plot(dt[:j], m[:j], color="lime", linestyle="-", lw=1.8, label="M_auc")
+                ax2.plot(dt[:j], r[:j], color="black", linestyle="-", lw=1.6, label="M_auc/S_auc")
+
+                ax1.set_xlim(x_min, x_max)
+                ax1.set_ylim(0, y_auc_max)
+                ax2.set_ylim(0, y_ratio_max)
+                ax1.set_ylabel("AUC")
+                ax2.set_ylabel("M_auc / S_auc")
+                ax1.set_xlabel("Timestamp")
+                ax1.grid(alpha=0.2)
+                ax1.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M:%S"))
+                fig.autofmt_xdate(rotation=20)
+                ax1.set_title(f"Tilt {int(tt)} | Time-series Build-up")
+
+                l1, lb1 = ax1.get_legend_handles_labels()
+                l2, lb2 = ax2.get_legend_handles_labels()
+                ax1.legend(l1 + l2, lb1 + lb2, loc="upper left")
+
+                fig.canvas.draw()
+                frame = np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
+                writer.append_data(frame)
+
+        plt.close(fig)
+        print(f"GIF saved to {out}")
+        outputs.append(out)
+
+    return outputs

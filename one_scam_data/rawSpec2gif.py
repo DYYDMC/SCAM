@@ -7,7 +7,12 @@ from datetime import datetime
 import argcomplete
 import numpy as np
 
-from gif_utils import generate_auc_summary_gif, generate_gif, generate_weighted_area_gif
+from gif_utils import (
+    generate_auc_summary_gif,
+    generate_auc_timeseries_by_tilt_gifs,
+    generate_gif,
+    generate_weighted_area_gif,
+)
 from spec_data_utils import load_pr_kernels_300_599
 
 
@@ -112,10 +117,13 @@ def main() -> None:
         raise KeyError("Expected key 'filtered_spectrum' in npz")
     if "int_t" not in z.files:
         raise KeyError("Expected key 'int_t' in npz for integration-time handling")
+    if "motor_tilt" not in z.files:
+        raise KeyError("Expected key 'motor_tilt' in npz for tilt-wise timeseries GIFs")
 
     raw = np.asarray(z[raw_key], dtype=np.float64)
     filtered = np.asarray(z["filtered_spectrum"], dtype=np.float64)
     int_t = np.asarray(z["int_t"], dtype=np.float64)
+    motor_tilt = np.asarray(z["motor_tilt"])
     unix_ts = np.asarray(z["unix_ts"]) if "unix_ts" in z.files else None
 
     if "wavelength" in z.files:
@@ -133,6 +141,7 @@ def main() -> None:
     raw = raw[keep]
     filtered = filtered[keep]
     int_t = int_t[keep]
+    motor_tilt = motor_tilt[keep]
     if unix_ts is not None:
         unix_ts = unix_ts[keep]
 
@@ -158,6 +167,7 @@ def main() -> None:
     out_filtered = os.path.join(target_dir, f"filtered_spectrum{suffix}.gif")
     out_weighted = os.path.join(target_dir, f"filtered_weighted_areas{suffix}.gif")
     out_auc = os.path.join(target_dir, f"auc_summary_ratio{suffix}.gif")
+    out_auc_ts_dir = target_dir
 
     if os.path.exists(out_raw) and not args.overwrite:
         print(f"[skip] exists: {out_raw}")
@@ -190,6 +200,7 @@ def main() -> None:
     auc_s = np.trapezoid(filtered * kernels["scone"], x=x, axis=1)
     auc_m = np.trapezoid(filtered * kernels["mcone"], x=x, axis=1)
     auc_r = np.trapezoid(filtered * kernels["rod"], x=x, axis=1)
+    auc_m_over_s = auc_m / np.where(auc_s == 0, np.nan, auc_s)
 
     if os.path.exists(out_weighted) and not args.overwrite:
         print(f"[skip] exists: {out_weighted}")
@@ -217,12 +228,35 @@ def main() -> None:
             fr=args.fr,
             titles=titles,
         )
+    if unix_ts is None:
+        raise KeyError("unix_ts is required to generate tilt-wise auc_timeseries GIFs")
+    expected_tilt_outputs = [
+        os.path.join(out_auc_ts_dir, f"auc_timeseries_tilt_{int(tt)}{suffix}.gif")
+        for tt in np.sort(np.unique(motor_tilt))[::-1]
+    ]
+    if (not args.overwrite) and expected_tilt_outputs and all(os.path.exists(p) for p in expected_tilt_outputs):
+        for p in expected_tilt_outputs:
+            print(f"[skip] exists: {p}")
+    else:
+        generate_auc_timeseries_by_tilt_gifs(
+            auc_s=auc_s,
+            auc_m=auc_m,
+            auc_m_over_s=auc_m_over_s,
+            unix_ts=unix_ts,
+            motor_tilt=motor_tilt,
+            output_dir=out_auc_ts_dir,
+            suffix=suffix,
+            freq=args.freq,
+            fr=args.fr,
+        )
 
     print("Done:")
     print(out_raw)
     print(out_filtered)
     print(out_weighted)
     print(out_auc)
+    for p in expected_tilt_outputs:
+        print(p)
 
 
 if __name__ == "__main__":
