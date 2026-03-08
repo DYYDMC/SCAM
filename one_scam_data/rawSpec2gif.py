@@ -30,39 +30,7 @@ def resolve_one_scam_path(target: str) -> str:
     raise FileNotFoundError(f"Cannot resolve ONE_SCAM path from: {target}")
 
 
-def build_titles(unix_ts: np.ndarray | None, int_t: np.ndarray | None, n_frames: int) -> list[str]:
-    titles: list[str] = []
-    for i in range(n_frames):
-        parts = [f"Frame {i}"]
-        if unix_ts is not None and i < len(unix_ts):
-            dt = datetime.fromtimestamp(int(unix_ts[i]))
-            parts = [dt.strftime("%Y-%m-%d %H:%M:%S")]
-        if int_t is not None and i < len(int_t):
-            parts.append(f"int_t={int(int_t[i])} ms")
-        titles.append(" | ".join(parts))
-    return titles
-
-
-def normalize_by_integration_time(
-    data: np.ndarray,
-    int_t_ms: np.ndarray,
-    mode: str,
-    max_int_t_ms: float,
-) -> np.ndarray:
-    it = np.asarray(int_t_ms, dtype=np.float64)
-    if np.any(it <= 0):
-        raise ValueError("Integration time contains non-positive values.")
-
-    if mode == "to_max":
-        # Equivalent intensity if all frames had max_int_t_ms integration time.
-        return data * (float(max_int_t_ms) / it[:, None])
-    if mode == "per_ms":
-        # Counts per ms.
-        return data / it[:, None]
-    raise ValueError(f"Unknown normalization mode: {mode}")
-
-
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Generate raw and filtered spectral GIFs from scan_data_optic_filtered.npz, "
@@ -100,14 +68,40 @@ def main() -> None:
         action="store_true",
         help="Regenerate GIFs even if output files already exist",
     )
-    argcomplete.autocomplete(parser)
-    args = parser.parse_args()
+    return parser
 
-    target_dir = resolve_one_scam_path(args.one_scam)
-    npz_path = os.path.join(target_dir, "scan_data_optic_filtered.npz")
-    if not os.path.exists(npz_path):
-        raise FileNotFoundError(f"Missing file: {npz_path}")
 
+def build_titles(unix_ts: np.ndarray | None, int_t: np.ndarray | None, n_frames: int) -> list[str]:
+    titles: list[str] = []
+    for i in range(n_frames):
+        parts = [f"Frame {i}"]
+        if unix_ts is not None and i < len(unix_ts):
+            dt = datetime.fromtimestamp(int(unix_ts[i]))
+            parts = [dt.strftime("%Y-%m-%d %H:%M:%S")]
+        if int_t is not None and i < len(int_t):
+            parts.append(f"int_t={int(int_t[i])} ms")
+        titles.append(" | ".join(parts))
+    return titles
+
+
+def normalize_by_integration_time(
+    data: np.ndarray,
+    int_t_ms: np.ndarray,
+    mode: str,
+    max_int_t_ms: float,
+) -> np.ndarray:
+    it = np.asarray(int_t_ms, dtype=np.float64)
+    if np.any(it <= 0):
+        raise ValueError("Integration time contains non-positive values.")
+
+    if mode == "to_max":
+        return data * (float(max_int_t_ms) / it[:, None])
+    if mode == "per_ms":
+        return data / it[:, None]
+    raise ValueError(f"Unknown normalization mode: {mode}")
+
+
+def load_npz_inputs(npz_path: str) -> dict[str, np.ndarray]:
     z = np.load(npz_path, allow_pickle=True)
 
     raw_key = "spectrum" if "spectrum" in z.files else "intensity"
@@ -134,64 +128,55 @@ def main() -> None:
 
     filtered_wavelengths = np.arange(300, 300 + filtered.shape[1], dtype=np.float64)
 
+    return {
+        "raw": raw,
+        "filtered": filtered,
+        "int_t": int_t,
+        "motor_tilt": motor_tilt,
+        "unix_ts": unix_ts,
+        "raw_wavelengths": raw_wavelengths,
+        "filtered_wavelengths": filtered_wavelengths,
+    }
+
+
+def apply_intt_filter(data: dict[str, np.ndarray], intt: int | None) -> dict[str, np.ndarray]:
+    raw = data["raw"]
     keep = np.ones(raw.shape[0], dtype=bool)
-    if args.intt is not None:
-        keep &= int_t.astype(int) == int(args.intt)
+    if intt is not None:
+        keep &= data["int_t"].astype(int) == int(intt)
 
-    raw = raw[keep]
-    filtered = filtered[keep]
-    int_t = int_t[keep]
-    motor_tilt = motor_tilt[keep]
-    if unix_ts is not None:
-        unix_ts = unix_ts[keep]
-
-    if raw.shape[0] == 0:
+    out = {
+        "raw": data["raw"][keep],
+        "filtered": data["filtered"][keep],
+        "int_t": data["int_t"][keep],
+        "motor_tilt": data["motor_tilt"][keep],
+        "unix_ts": data["unix_ts"][keep] if data["unix_ts"] is not None else None,
+        "raw_wavelengths": data["raw_wavelengths"],
+        "filtered_wavelengths": data["filtered_wavelengths"],
+    }
+    if out["raw"].shape[0] == 0:
         raise ValueError("No frames left after filtering; adjust --intt or input data.")
+    return out
 
+
+def apply_optional_normalization(
+    data: dict[str, np.ndarray],
+    normalize_by_intt: bool,
+    norm_mode: str,
+    max_intt: float,
+) -> tuple[dict[str, np.ndarray], str]:
+    out = dict(data)
     suffix = ""
-    if args.normalize_by_intt:
-        raw = normalize_by_integration_time(raw, int_t, mode=args.norm_mode, max_int_t_ms=args.max_intt)
-        filtered = normalize_by_integration_time(filtered, int_t, mode=args.norm_mode, max_int_t_ms=args.max_intt)
+    if normalize_by_intt:
+        out["raw"] = normalize_by_integration_time(out["raw"], out["int_t"], mode=norm_mode, max_int_t_ms=max_intt)
+        out["filtered"] = normalize_by_integration_time(
+            out["filtered"], out["int_t"], mode=norm_mode, max_int_t_ms=max_intt
+        )
         suffix += "_normedIntt"
+    return out, suffix
 
-    if args.intt is not None:
-        suffix += f"_intt-{int(args.intt)}"
 
-    # Keep title behavior consistent with normalization:
-    # normalized -> hide int_t, not normalized -> show int_t
-    hide_intt_title = args.normalize_by_intt or args.hide_intt_title
-    title_int_t = None if hide_intt_title else int_t
-    titles = build_titles(unix_ts=unix_ts, int_t=title_int_t, n_frames=raw.shape[0])
-
-    out_raw = os.path.join(target_dir, f"raw_spectrum{suffix}.gif")
-    out_filtered = os.path.join(target_dir, f"filtered_spectrum{suffix}.gif")
-    out_weighted = os.path.join(target_dir, f"filtered_weighted_areas{suffix}.gif")
-    out_auc = os.path.join(target_dir, f"auc_summary_ratio{suffix}.gif")
-    out_auc_ts_dir = target_dir
-
-    if os.path.exists(out_raw) and not args.overwrite:
-        print(f"[skip] exists: {out_raw}")
-    else:
-        generate_gif(
-            data=raw,
-            wavelengths=raw_wavelengths,
-            output_path=out_raw,
-            freq=args.freq,
-            fr=args.fr,
-            titles=titles,
-        )
-    if os.path.exists(out_filtered) and not args.overwrite:
-        print(f"[skip] exists: {out_filtered}")
-    else:
-        generate_gif(
-            data=filtered,
-            wavelengths=filtered_wavelengths,
-            output_path=out_filtered,
-            freq=args.freq,
-            fr=args.fr,
-            titles=titles,
-        )
-
+def compute_auc_from_filtered(filtered: np.ndarray) -> dict[str, np.ndarray]:
     kernels = load_pr_kernels_300_599()
     x = kernels["wavelength"]
     if filtered.shape[1] != len(x):
@@ -201,61 +186,184 @@ def main() -> None:
     auc_m = np.trapezoid(filtered * kernels["mcone"], x=x, axis=1)
     auc_r = np.trapezoid(filtered * kernels["rod"], x=x, axis=1)
     auc_m_over_s = auc_m / np.where(auc_s == 0, np.nan, auc_s)
+    return {
+        "kernels": kernels,
+        "auc_s": auc_s,
+        "auc_m": auc_m,
+        "auc_r": auc_r,
+        "auc_m_over_s": auc_m_over_s,
+    }
 
-    if os.path.exists(out_weighted) and not args.overwrite:
-        print(f"[skip] exists: {out_weighted}")
-    else:
-        generate_weighted_area_gif(
-            filtered=filtered,
-            wavelengths=x,
-            scone=kernels["scone"],
-            mcone=kernels["mcone"],
-            rod=kernels["rod"],
-            output_path=out_weighted,
-            freq=args.freq,
-            fr=args.fr,
+
+def build_output_paths(target_dir: str, suffix: str) -> dict[str, str]:
+    return {
+        "raw": os.path.join(target_dir, f"raw_spectrum{suffix}.gif"),
+        "filtered": os.path.join(target_dir, f"filtered_spectrum{suffix}.gif"),
+        "weighted": os.path.join(target_dir, f"filtered_weighted_areas{suffix}.gif"),
+        "auc_summary": os.path.join(target_dir, f"auc_summary_ratio{suffix}.gif"),
+        "out_dir": target_dir,
+    }
+
+
+def maybe_generate(path: str, overwrite: bool, fn) -> None:
+    if os.path.exists(path) and not overwrite:
+        print(f"[skip] exists: {path}")
+        return
+    fn()
+
+
+def generate_standard_gifs(
+    data: dict[str, np.ndarray],
+    auc: dict[str, np.ndarray],
+    titles: list[str],
+    outputs: dict[str, str],
+    freq: int,
+    fr: int,
+    overwrite: bool,
+) -> None:
+    maybe_generate(
+        outputs["raw"],
+        overwrite,
+        lambda: generate_gif(
+            data=data["raw"],
+            wavelengths=data["raw_wavelengths"],
+            output_path=outputs["raw"],
+            freq=freq,
+            fr=fr,
             titles=titles,
-        )
-    if os.path.exists(out_auc) and not args.overwrite:
-        print(f"[skip] exists: {out_auc}")
-    else:
-        generate_auc_summary_gif(
-            auc_s=auc_s,
-            auc_m=auc_m,
-            auc_r=auc_r,
-            output_path=out_auc,
-            freq=args.freq,
-            fr=args.fr,
+        ),
+    )
+    maybe_generate(
+        outputs["filtered"],
+        overwrite,
+        lambda: generate_gif(
+            data=data["filtered"],
+            wavelengths=data["filtered_wavelengths"],
+            output_path=outputs["filtered"],
+            freq=freq,
+            fr=fr,
             titles=titles,
-        )
-    if unix_ts is None:
+        ),
+    )
+    maybe_generate(
+        outputs["weighted"],
+        overwrite,
+        lambda: generate_weighted_area_gif(
+            filtered=data["filtered"],
+            wavelengths=auc["kernels"]["wavelength"],
+            scone=auc["kernels"]["scone"],
+            mcone=auc["kernels"]["mcone"],
+            rod=auc["kernels"]["rod"],
+            output_path=outputs["weighted"],
+            freq=freq,
+            fr=fr,
+            titles=titles,
+        ),
+    )
+    maybe_generate(
+        outputs["auc_summary"],
+        overwrite,
+        lambda: generate_auc_summary_gif(
+            auc_s=auc["auc_s"],
+            auc_m=auc["auc_m"],
+            auc_r=auc["auc_r"],
+            output_path=outputs["auc_summary"],
+            freq=freq,
+            fr=fr,
+            titles=titles,
+        ),
+    )
+
+
+def generate_tilt_timeseries_gifs(
+    data: dict[str, np.ndarray],
+    auc: dict[str, np.ndarray],
+    out_dir: str,
+    suffix: str,
+    freq: int,
+    fr: int,
+    overwrite: bool,
+) -> list[str]:
+    if data["unix_ts"] is None:
         raise KeyError("unix_ts is required to generate tilt-wise auc_timeseries GIFs")
-    expected_tilt_outputs = [
-        os.path.join(out_auc_ts_dir, f"auc_timeseries_tilt_{int(tt)}{suffix}.gif")
-        for tt in np.sort(np.unique(motor_tilt))[::-1]
+
+    expected = [
+        os.path.join(out_dir, f"auc_timeseries_tilt_{int(tt)}{suffix}.gif")
+        for tt in np.sort(np.unique(data["motor_tilt"]))[::-1]
     ]
-    if (not args.overwrite) and expected_tilt_outputs and all(os.path.exists(p) for p in expected_tilt_outputs):
-        for p in expected_tilt_outputs:
+
+    if (not overwrite) and expected and all(os.path.exists(p) for p in expected):
+        for p in expected:
             print(f"[skip] exists: {p}")
-    else:
-        generate_auc_timeseries_by_tilt_gifs(
-            auc_s=auc_s,
-            auc_m=auc_m,
-            auc_m_over_s=auc_m_over_s,
-            unix_ts=unix_ts,
-            motor_tilt=motor_tilt,
-            output_dir=out_auc_ts_dir,
-            suffix=suffix,
-            freq=args.freq,
-            fr=args.fr,
-        )
+        return expected
+
+    generate_auc_timeseries_by_tilt_gifs(
+        auc_s=auc["auc_s"],
+        auc_m=auc["auc_m"],
+        auc_m_over_s=auc["auc_m_over_s"],
+        unix_ts=data["unix_ts"],
+        motor_tilt=data["motor_tilt"],
+        output_dir=out_dir,
+        suffix=suffix,
+        freq=freq,
+        fr=fr,
+    )
+    return expected
+
+
+def main() -> None:
+    parser = build_parser()
+    argcomplete.autocomplete(parser)
+    args = parser.parse_args()
+
+    target_dir = resolve_one_scam_path(args.one_scam)
+    npz_path = os.path.join(target_dir, "scan_data_optic_filtered.npz")
+    if not os.path.exists(npz_path):
+        raise FileNotFoundError(f"Missing file: {npz_path}")
+
+    data = load_npz_inputs(npz_path)
+    data = apply_intt_filter(data, args.intt)
+    data, suffix = apply_optional_normalization(
+        data,
+        normalize_by_intt=args.normalize_by_intt,
+        norm_mode=args.norm_mode,
+        max_intt=args.max_intt,
+    )
+    if args.intt is not None:
+        suffix += f"_intt-{int(args.intt)}"
+
+    hide_intt_title = args.normalize_by_intt or args.hide_intt_title
+    title_int_t = None if hide_intt_title else data["int_t"]
+    titles = build_titles(unix_ts=data["unix_ts"], int_t=title_int_t, n_frames=data["raw"].shape[0])
+
+    auc = compute_auc_from_filtered(data["filtered"])
+    outputs = build_output_paths(target_dir, suffix)
+
+    generate_standard_gifs(
+        data=data,
+        auc=auc,
+        titles=titles,
+        outputs=outputs,
+        freq=args.freq,
+        fr=args.fr,
+        overwrite=args.overwrite,
+    )
+    tilt_outputs = generate_tilt_timeseries_gifs(
+        data=data,
+        auc=auc,
+        out_dir=outputs["out_dir"],
+        suffix=suffix,
+        freq=args.freq,
+        fr=args.fr,
+        overwrite=args.overwrite,
+    )
 
     print("Done:")
-    print(out_raw)
-    print(out_filtered)
-    print(out_weighted)
-    print(out_auc)
-    for p in expected_tilt_outputs:
+    print(outputs["raw"])
+    print(outputs["filtered"])
+    print(outputs["weighted"])
+    print(outputs["auc_summary"])
+    for p in tilt_outputs:
         print(p)
 
 
