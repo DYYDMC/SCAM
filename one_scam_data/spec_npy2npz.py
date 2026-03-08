@@ -21,60 +21,62 @@ def main() -> None:
         print(f"No .npy files found under: {scan_dir}")
         sys.exit(1)
 
-    wavelength_list = []
-    spectrum_list = []
-    dark_corr = []
-    int_t = []
-    motor_pan = []
-    motor_tilt = []
-    unix_ts = []
-    year = []
-    month = []
-    day = []
-    hour = []
-    minute = []
-    second = []
+    rows = []
 
     for npy_file in all_npys:
         scan_dict = np.load(npy_file, allow_pickle=True).item()
         dt = datetime.strptime(scan_dict["ts"], "%Y%m%d_%H%M%S")
 
-        # Keep spectral data at float64 as requested.
-        wavelength_list.append(np.asarray(scan_dict["wavelengths"], dtype=np.float64))
-        spectrum_list.append(np.asarray(scan_dict["intensity"], dtype=np.float64))
+        rows.append(
+            {
+                "wavelength": np.asarray(scan_dict["wavelengths"], dtype=np.float64),
+                "spectrum": np.asarray(scan_dict["intensity"], dtype=np.float64),
+                "dark_corr": scan_dict["metadata"]["dark_correction_applied"],
+                "int_t": scan_dict["metadata"]["integration_time_ms"],
+                "motor_pan": scan_dict["motor_pan"],
+                "motor_tilt": scan_dict["motor_tilt"],
+                "unix_ts": int(dt.timestamp()),
+                "year": dt.year,
+                "month": dt.month,
+                "day": dt.day,
+                "hour": dt.hour,
+                "minute": dt.minute,
+                "second": dt.second,
+            }
+        )
 
-        dark_corr.append(scan_dict["metadata"]["dark_correction_applied"])
-        int_t.append(scan_dict["metadata"]["integration_time_ms"])
-        motor_pan.append(scan_dict["motor_pan"])
-        motor_tilt.append(scan_dict["motor_tilt"])
+    rows.sort(key=lambda r: r["unix_ts"])
 
-        unix_ts.append(int(dt.timestamp()))
-        year.append(dt.year)
-        month.append(dt.month)
-        day.append(dt.day)
-        hour.append(dt.hour)
-        minute.append(dt.minute)
-        second.append(dt.second)
-
-    wavelength = np.stack(wavelength_list)
-    spectrum = np.stack(spectrum_list)
+    wavelength = np.stack([r["wavelength"] for r in rows])
+    spectrum = np.stack([r["spectrum"] for r in rows])
+    dark_corr = np.asarray([r["dark_corr"] for r in rows], dtype=np.bool_)
+    int_t = np.asarray([r["int_t"] for r in rows], dtype=np.uint32)
+    motor_pan = np.asarray([r["motor_pan"] for r in rows], dtype=np.int16)
+    motor_tilt = np.asarray([r["motor_tilt"] for r in rows], dtype=np.int16)
+    unix_ts = np.asarray([r["unix_ts"] for r in rows], dtype=np.int64)
+    year = np.asarray([r["year"] for r in rows], dtype=np.uint16)
+    month = np.asarray([r["month"] for r in rows], dtype=np.uint8)
+    day = np.asarray([r["day"] for r in rows], dtype=np.uint8)
+    hour = np.asarray([r["hour"] for r in rows], dtype=np.uint8)
+    minute = np.asarray([r["minute"] for r in rows], dtype=np.uint8)
+    second = np.asarray([r["second"] for r in rows], dtype=np.uint8)
 
     out_npz = os.path.join(target_dir, "scan_data.npz")
     np.savez_compressed(
         out_npz,
         wavelength=wavelength,
         spectrum=spectrum,
-        dark_corr=np.asarray(dark_corr, dtype=np.bool_),
-        int_t=np.asarray(int_t, dtype=np.uint32),
-        motor_pan=np.asarray(motor_pan, dtype=np.int16),
-        motor_tilt=np.asarray(motor_tilt, dtype=np.int16),
-        unix_ts=np.asarray(unix_ts, dtype=np.int64),
-        year=np.asarray(year, dtype=np.uint16),
-        month=np.asarray(month, dtype=np.uint8),
-        day=np.asarray(day, dtype=np.uint8),
-        hour=np.asarray(hour, dtype=np.uint8),
-        minute=np.asarray(minute, dtype=np.uint8),
-        second=np.asarray(second, dtype=np.uint8),
+        dark_corr=dark_corr,
+        int_t=int_t,
+        motor_pan=motor_pan,
+        motor_tilt=motor_tilt,
+        unix_ts=unix_ts,
+        year=year,
+        month=month,
+        day=day,
+        hour=hour,
+        minute=minute,
+        second=second,
     )
 
     print(f"saved: {out_npz}")
