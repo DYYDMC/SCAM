@@ -90,6 +90,11 @@ def main() -> None:
         action="store_true",
         help="Hide integration time from frame titles (auto-enabled when normalization is on)",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Regenerate GIFs even if output files already exist",
+    )
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
@@ -154,22 +159,28 @@ def main() -> None:
     out_weighted = os.path.join(target_dir, f"filtered_weighted_areas{suffix}.gif")
     out_auc = os.path.join(target_dir, f"auc_summary_ratio{suffix}.gif")
 
-    generate_gif(
-        data=raw,
-        wavelengths=raw_wavelengths,
-        output_path=out_raw,
-        freq=args.freq,
-        fr=args.fr,
-        titles=titles,
-    )
-    generate_gif(
-        data=filtered,
-        wavelengths=filtered_wavelengths,
-        output_path=out_filtered,
-        freq=args.freq,
-        fr=args.fr,
-        titles=titles,
-    )
+    if os.path.exists(out_raw) and not args.overwrite:
+        print(f"[skip] exists: {out_raw}")
+    else:
+        generate_gif(
+            data=raw,
+            wavelengths=raw_wavelengths,
+            output_path=out_raw,
+            freq=args.freq,
+            fr=args.fr,
+            titles=titles,
+        )
+    if os.path.exists(out_filtered) and not args.overwrite:
+        print(f"[skip] exists: {out_filtered}")
+    else:
+        generate_gif(
+            data=filtered,
+            wavelengths=filtered_wavelengths,
+            output_path=out_filtered,
+            freq=args.freq,
+            fr=args.fr,
+            titles=titles,
+        )
 
     kernels = load_pr_kernels_300_599()
     x = kernels["wavelength"]
@@ -180,26 +191,32 @@ def main() -> None:
     auc_m = np.trapezoid(filtered * kernels["mcone"], x=x, axis=1)
     auc_r = np.trapezoid(filtered * kernels["rod"], x=x, axis=1)
 
-    generate_weighted_area_gif(
-        filtered=filtered,
-        wavelengths=x,
-        scone=kernels["scone"],
-        mcone=kernels["mcone"],
-        rod=kernels["rod"],
-        output_path=out_weighted,
-        freq=args.freq,
-        fr=args.fr,
-        titles=titles,
-    )
-    generate_auc_summary_gif(
-        auc_s=auc_s,
-        auc_m=auc_m,
-        auc_r=auc_r,
-        output_path=out_auc,
-        freq=args.freq,
-        fr=args.fr,
-        titles=titles,
-    )
+    if os.path.exists(out_weighted) and not args.overwrite:
+        print(f"[skip] exists: {out_weighted}")
+    else:
+        generate_weighted_area_gif(
+            filtered=filtered,
+            wavelengths=x,
+            scone=kernels["scone"],
+            mcone=kernels["mcone"],
+            rod=kernels["rod"],
+            output_path=out_weighted,
+            freq=args.freq,
+            fr=args.fr,
+            titles=titles,
+        )
+    if os.path.exists(out_auc) and not args.overwrite:
+        print(f"[skip] exists: {out_auc}")
+    else:
+        generate_auc_summary_gif(
+            auc_s=auc_s,
+            auc_m=auc_m,
+            auc_r=auc_r,
+            output_path=out_auc,
+            freq=args.freq,
+            fr=args.fr,
+            titles=titles,
+        )
 
     print("Done:")
     print(out_raw)
