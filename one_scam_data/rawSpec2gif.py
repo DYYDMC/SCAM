@@ -7,7 +7,8 @@ from datetime import datetime
 import argcomplete
 import numpy as np
 
-from gif_utils import generate_gif
+from gif_utils import generate_auc_summary_gif, generate_gif, generate_weighted_area_gif
+from spec_data_utils import load_pr_kernels_300_599
 
 
 def resolve_one_scam_path(target: str) -> str:
@@ -150,6 +151,8 @@ def main() -> None:
 
     out_raw = os.path.join(target_dir, f"raw_spectrum{suffix}.gif")
     out_filtered = os.path.join(target_dir, f"filtered_spectrum{suffix}.gif")
+    out_weighted = os.path.join(target_dir, f"filtered_weighted_areas{suffix}.gif")
+    out_auc = os.path.join(target_dir, f"auc_summary_ratio{suffix}.gif")
 
     generate_gif(
         data=raw,
@@ -168,9 +171,41 @@ def main() -> None:
         titles=titles,
     )
 
+    kernels = load_pr_kernels_300_599()
+    x = kernels["wavelength"]
+    if filtered.shape[1] != len(x):
+        raise ValueError("filtered_spectrum width does not match 300-599 kernel range")
+
+    auc_s = np.trapezoid(filtered * kernels["scone"], x=x, axis=1)
+    auc_m = np.trapezoid(filtered * kernels["mcone"], x=x, axis=1)
+    auc_r = np.trapezoid(filtered * kernels["rod"], x=x, axis=1)
+
+    generate_weighted_area_gif(
+        filtered=filtered,
+        wavelengths=x,
+        scone=kernels["scone"],
+        mcone=kernels["mcone"],
+        rod=kernels["rod"],
+        output_path=out_weighted,
+        freq=args.freq,
+        fr=args.fr,
+        titles=titles,
+    )
+    generate_auc_summary_gif(
+        auc_s=auc_s,
+        auc_m=auc_m,
+        auc_r=auc_r,
+        output_path=out_auc,
+        freq=args.freq,
+        fr=args.fr,
+        titles=titles,
+    )
+
     print("Done:")
     print(out_raw)
     print(out_filtered)
+    print(out_weighted)
+    print(out_auc)
 
 
 if __name__ == "__main__":
