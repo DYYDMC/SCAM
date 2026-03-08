@@ -134,7 +134,7 @@ def main() -> None:
     if args.normalize_by_intt:
         raw = normalize_by_integration_time(raw, int_t, mode=args.norm_mode, max_int_t_ms=args.max_intt)
         filtered = normalize_by_integration_time(filtered, int_t, mode=args.norm_mode, max_int_t_ms=args.max_intt)
-        suffix += f"_norm-{args.norm_mode}"
+        suffix += "_normedIntt"
 
     if args.intt is not None:
         suffix += f"_intt-{int(args.intt)}"
