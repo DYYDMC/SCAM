@@ -8,7 +8,7 @@ cam1_center_x=center_uv(1);cam1_center_y=center_uv(2);
 cam1_radius=cam1_mask_radius;
 %cam1_mask=flipud(cam1_mask);
 %% make a square mask
-reduceFactor=.8;
+reduceFactor=.85;
 %% the largest concentric square that fit inside the circular mask
 half = round(cam1_radius/sqrt(2));
 
@@ -31,6 +31,6 @@ mfile2.half=half;
 mfile2.square_mask=cam1_square_mask;
 mfile2.circle_mask=cam1_mask;
 %%
-save('cam1_mask.mat','-struct','mfile2')
+save('cam1_mask85.mat','-struct','mfile2')
 %%
 imshowpair(cam1_square_mask,cam1_mask)
