@@ -431,7 +431,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         print(f'initial cam1_mean1: {self.cam1_mean1}')
         MAX_EXPO_RETRY = 3
-        TARGET_LOW = 4096 * 1.05
+        TARGET_LOW = 15000
         TARGET_HIGH = 42000
         P99_MAX = 64500
         SAT_FRAC_MAX = 0.4  # 1.0%
