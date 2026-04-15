@@ -6,3 +6,9 @@
 - **Change**: Both left y-axis (S_auc, M_auc) and right y-axis (M/S ratio) now use `set_yscale("log")` instead of linear.
 - **Reason**: Linear scale compressed low-value dynamics; log scale better reveals variation across orders of magnitude.
 - **Lower y-limit** set to `None` (matplotlib auto) since `0` is invalid on a log scale.
+
+## 2026-04-15: Fix drifting y-axis ticks on log-scale AUC subplot
+
+- **File**: `gif_utils.py`, function `generate_auc_timeseries_5tilt_gif`
+- **Change**: Compute `global_auc_min` across all tilts and pin the AUC y-axis to `(global_auc_min * 0.9, global_auc_max)` so the log-scale limits stay fixed across all frames.
+- **Reason**: With `None` as lower limit, matplotlib auto-scaled per frame, causing tick labels to drift and get squeezed as the animation progressed.

@@ -414,6 +414,7 @@ def generate_auc_timeseries_5tilt_gif(
     per_tilt = []
     max_frames = 0
     global_auc_max = 0.0
+    global_auc_min = np.inf
     global_ratio_max = 0.0
     for tt in all_tilts:
         mask = motor_tilt == tt
@@ -432,6 +433,10 @@ def generate_auc_timeseries_5tilt_gif(
             y_auc_max = 1.0
         if y_ratio_max <= 0 or not np.isfinite(y_ratio_max):
             y_ratio_max = 1.0
+        y_auc_min = float(np.nanmin(np.vstack([s, m])))
+        if y_auc_min <= 0 or not np.isfinite(y_auc_min):
+            y_auc_min = 1e-3
+        global_auc_min = min(global_auc_min, y_auc_min)
         global_auc_max = max(global_auc_max, y_auc_max)
         global_ratio_max = max(global_ratio_max, y_ratio_max)
         per_tilt.append(
@@ -472,7 +477,7 @@ def generate_auc_timeseries_5tilt_gif(
 
                 ax.set_xlim(d["x_min"], d["x_max"])
                 ax.set_yscale("log")
-                ax.set_ylim(None, global_auc_max)
+                ax.set_ylim(global_auc_min * 0.9, global_auc_max)
                 # ax2.set_yscale("log")
                 ax2.set_ylim(None, global_ratio_max)
                 ax.set_ylabel("AUC")
