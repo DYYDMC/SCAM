@@ -471,8 +471,10 @@ def generate_auc_timeseries_5tilt_gif(
                 ax2.plot(d["dt"][:j], d["ratio"][:j], color="black", lw=1.4, label="M_auc/S_auc")
 
                 ax.set_xlim(d["x_min"], d["x_max"])
-                ax.set_ylim(0, global_auc_max)
-                ax2.set_ylim(0, global_ratio_max)
+                ax.set_yscale("log")
+                ax.set_ylim(None, global_auc_max)
+                ax2.set_yscale("log")
+                ax2.set_ylim(None, global_ratio_max)
                 ax.set_ylabel("AUC")
                 ax2.set_ylabel("M/S")
                 ax2.yaxis.set_label_position("right")
