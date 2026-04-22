@@ -148,7 +148,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         # SCAM
         self.btn_update.clicked.connect(self.on_update_parameters)
-        self.btn_start_point_scan.clicked.connect(self.on_start_point_scan)# point scan
+        self.btn_start_point_scan.clicked.connect(self.on_start_point_scan2)# point scan
         self.btn_start_full_scan.clicked.connect(self.on_start_full_scan) 
         self.btn_start_pano.clicked.connect(self.on_start_pano) # only camera-based pano scan
         self.btn_start_point_scam.clicked.connect(self.on_start_point_scam)
@@ -630,7 +630,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             int_t = new_int
         
         return int_t
+    def on_start_point_scan2(self):
+        # print("I AM HERE!! SCAM ONE POSITION!")
+        NUM_SCAN_ITERATION = 3*(len(SPEC_TILT_POS)+1)
+        start_time = time.strftime("%Y%m%d_%H%M%S")
+        scan_data_supfolder = os.path.join(POINT_SCAN_DATA_PATH, f"POINT_SCAN_{start_time}")
+        os.makedirs(scan_data_path, exist_ok=True)
+
+        scan_data_path = os.path.join(scan_data_supfolder, "scan_data")
+        os.makedirs(scan_data_path, exist_ok=True)
         
+        print(f"Data will be saved to: {scan_data_supfolder}")
+        self.on_update_parameters()
+        self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+        self.next_pan = self.pan_oneScan
+        self.next_tilt = self.tilt_oneScan
+
+        # init integration time for different tilts
+        int_t_dict = {tilt: self.int_oneScan for tilt in SPEC_TILT_POS}
+        print(f"Starting POINT SCAN:")
+        
+        for ii in range(NUM_SCAN_ITERATION):
+            for ss,tilt in enumerate(SPEC_TILT_POS):
+                self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
+                self.next_pan,self.next_tilt = self.pan_oneScan, tilt
+                
+                # move to position
+                self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+                self.motor_wait()
+                
+                # adjust integration time based on the previous scan result at the same tilt position
+                int_t_dict[tilt] = self.adjust_int_t(int_t_dict[tilt])
+                print('finished adjust_int_t(), now int_t for {} tilt is {}'.format(tilt,int_t_dict[tilt]))
+                
+                # scan and save result
+                result_ = self.spec_controller.scan(int_t_dict[tilt])
+                result_['motor_pan'] = self.pan_oneScan
+                result_['motor_tilt'] = tilt
+                result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
+                np.save(os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}"), result_)
     def on_start_point_scan(self):
         """
         Start a point scan by capturing spectral data at specific positions.
@@ -793,7 +831,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
         NUM_CAM = 40
-        NUM_SCAN_ITERATION = 10*(len(SPEC_TILT_POS)+1)
+        NUM_SCAN_ITERATION = 3*(len(SPEC_TILT_POS)+1)
         RECALIBRATE_EVERY = 4
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"ONE_SCAM_{start_time}")
