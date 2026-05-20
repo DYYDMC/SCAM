@@ -1,0 +1,9 @@
+1.camera-ready at setup2
+2. mixed light source [2,0,0][50,10,0] -> large light speckle, 50uv 10blue
+3. use a smooth A4 paper, create a curvture on top of the camera lens
+4. illuminate the paper from the concave side (uv can not pass the paper...)
+5. the illumination (on the sensor) will NOT be ideally homogenous, but this is the best solution so far
+6. take raw images using the appropriate shutter,gain (commit hash 6e8981163544810e8b6501f83ba52425d7eec00f)
+7. take .raw images
+8. extract B from uv cam, G from g cam
+9. run the .m script to extract the circular rois

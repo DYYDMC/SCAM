@@ -307,7 +307,7 @@
       <item row="3" column="1">
        <widget class="QDoubleSpinBox" name="doubleSpinBox_uv_gain">
         <property name="minimum">
-         <double>1.120000000000000</double>
+         <double>8.000000000000000</double>
         </property>
         <property name="maximum">
          <double>8.000000000000000</double>
@@ -316,7 +316,7 @@
          <double>0.500000000000000</double>
         </property>
         <property name="value">
-         <double>1.120000000000000</double>
+         <double>8.000000000000000</double>
         </property>
        </widget>
       </item>
@@ -436,17 +436,17 @@
       </item>
      </layout>
     </widget>
-    <widget class="QPushButton" name="btn_start_scam">
+    <widget class="QPushButton" name="btn_start_full_scam">
      <property name="geometry">
       <rect>
-       <x>296</x>
+       <x>288</x>
        <y>512</y>
-       <width>65</width>
+       <width>73</width>
        <height>32</height>
       </rect>
      </property>
      <property name="text">
-      <string>SCAM</string>
+      <string>full SCAM</string>
      </property>
     </widget>
     <widget class="QPushButton" name="btn_both_shoot">
@@ -466,39 +466,39 @@
      <property name="geometry">
       <rect>
        <x>0</x>
-       <y>512</y>
-       <width>65</width>
+       <y>208</y>
+       <width>121</width>
        <height>32</height>
       </rect>
      </property>
      <property name="text">
-      <string>UPDATE</string>
+      <string>UPDATE params</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="btn_start_cam">
+    <widget class="QPushButton" name="btn_start_pano">
      <property name="geometry">
       <rect>
-       <x>240</x>
+       <x>152</x>
        <y>512</y>
        <width>49</width>
        <height>32</height>
       </rect>
      </property>
      <property name="text">
-      <string>CAM</string>
+      <string>PANO</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="btn_start_scan">
+    <widget class="QPushButton" name="btn_start_point_scam">
      <property name="geometry">
       <rect>
-       <x>152</x>
+       <x>208</x>
        <y>512</y>
        <width>81</width>
        <height>32</height>
       </rect>
      </property>
      <property name="text">
-      <string>pointSCAN</string>
+      <string>point SCAM</string>
      </property>
     </widget>
     <widget class="QWidget" name="verticalLayoutWidget">
@@ -689,14 +689,27 @@
     <widget class="QPushButton" name="btn_start_full_scan">
      <property name="geometry">
       <rect>
-       <x>64</x>
+       <x>80</x>
+       <y>512</y>
+       <width>73</width>
+       <height>32</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>full SCAN</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btn_start_point_scan">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
        <y>512</y>
        <width>81</width>
        <height>32</height>
       </rect>
      </property>
      <property name="text">
-      <string>FULL SCAN</string>
+      <string>pointSCAN</string>
      </property>
     </widget>
    </widget>

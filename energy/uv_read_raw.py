@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import os
@@ -42,13 +43,16 @@ def read_frame_with_stride(raw_file, frame_idx=0, width=4056, height=3040, strid
     return image
 
 #clean_gain_toPlot = []
-shutters=[1,5,10,20,30,50,100,300,500,600,700,800,900,999]
+# shutters=[1,5,10,20,30,50,100,300,500,600,700,800,900,999]
+#shutters=[1,30,500,999]
+shutters=[1,5,10,20,30,50,100,300,500,999]
+#ags= [1,4,8]
 ags= [1,1.1,1.2,1.5,2,4,6,8]
 #shutters1=[1,5,10,15,20,30,40,50,80,100]
 #shutters1=np.arange(100,2100,100)
 #ags = [1,1.1,1.2,1.3,1.4,1.5,1.8,2,2.5,3,4,5,6,7,8]
-#for powerLevel in [10]:
-for powerLevel in [10,20,50,75,100]:
+for powerLevel in [10,75]:
+#for powerLevel in [10,20,50,75100]:
     UV_RAW_PATH = os.path.join(ENERGY_PATH,f'UV{powerLevel}')
     mean_pxl = np.zeros((len(shutters),len(ags)))
     for mm,ms in enumerate(shutters):
@@ -92,8 +96,6 @@ for powerLevel in [10,20,50,75,100]:
             selected_area = deNoise_frame[y_center-half_size:y_center+half_size,x_center-half_size:x_center+half_size]
             print(selected_area.shape)
             data =selected_area.flatten()
-            print(y_center-half_size,y_center+half_size)
-            print(data.shape)
             # data = deNoise_frame.flatten()
             bin_edges = np.linspace(0, 65520-4096, 50)
             counts, edges = np.histogram(data, bins=bin_edges)
@@ -104,6 +106,7 @@ for powerLevel in [10,20,50,75,100]:
             # print(f'min: {np.min(frame)}, max: {np.max(frame)}, max_wo_darkNoise: {np.max(frame)-np.min(frame)}, gain: {ag}, shutter: {ms}ms')
             # clean_gain_toPlot.append(np.max(frame)-np.min(frame))
             print(f'min: {np.min(data)}, max: {np.max(data)}, mean_pxlValue: {mean_deNoise_pxelValue}, gain: {ag}, shutter: {ms}ms')
+            print(f'mode: {stats.mode(data)}')
             #clean_gain_toPlot.append(np.sum(deNoise_frame/3040/4056))
 
             del frame

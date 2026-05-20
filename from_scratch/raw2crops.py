@@ -66,6 +66,7 @@ os.makedirs(cropped_folder, exist_ok=True)
 img_paths = glob.glob(os.path.join(img_folder, "*.jpg"))
 # crop and de-vignette each image, with intermediate outputs saved
 for img_path in img_paths:
+    print(img_path)
     fname = os.path.basename(img_path)
 
     cropped_fname = fname.replace('.jpg', '_cropped.jpg')
@@ -77,4 +78,4 @@ for img_path in img_paths:
                                  CAM0_ROI_NPY if 'cam0' in img_path else CAM1_ROI_NPY,
                                  cropped_output_path)
     print(cropped.shape)
-    break
+    # break
