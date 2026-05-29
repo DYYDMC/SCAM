@@ -573,10 +573,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         cam_path = [(pp,tt) for tt in self.tilt_positions for pp in self.pan_positions]
         return cam_path
     def on_start_full_scan(self):
-        print("I AM HERE!! FULL SCAN!")
         start_time = time.strftime("%Y%m%d_%H%M%S")
         full_scan_save_path = os.path.join(FULL_SCAN_PATH, f"FULL_SCAN_{start_time}")
         os.makedirs(full_scan_save_path, exist_ok=True)
+        cam0_data_path = os.path.join(full_scan_save_path, "cam0")
+        cam1_data_path = os.path.join(full_scan_save_path, "cam1")
+        
+        os.makedirs(cam0_data_path, exist_ok=True)
+        os.makedirs(cam1_data_path, exist_ok=True)
         """Start full spectral scan for scene reconstruction"""
         self.on_update_parameters()
         self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
@@ -588,16 +592,48 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pan_step = 1
             self.tilt_step = 1
             # hardcode the area to scan, corresponding to the area shown in Fig2
-            # self.pan_min,self.pan_max = -18,18
-            # self.tilt_min,self.tilt_max = -18,18
-            self.pan_min,self.pan_max = -1,1
-            self.tilt_min,self.tilt_max = -1,1
-            NUM_FULL_SCAN_ITERATION=2
+            self.pan_min,self.pan_max = -18,18
+            self.tilt_min,self.tilt_max = -18,18
+            # self.pan_min,self.pan_max = 0,1
+            # self.tilt_min,self.tilt_max = 0,1
+            NUM_FULL_SCAN_ITERATION=100
+            RECALIBRATE_EVERY =5
             self.cam_path = self.calculate_pano_positions()
             int_t_dict = {pos[1]: self.int_oneScan for pos in self.cam_path}
             # save the scan positions
             np.savez(os.path.join(full_scan_save_path,'scan_positions.npz'),positions=self.cam_path)
             for ii in range(NUM_FULL_SCAN_ITERATION):
+                print('!!!!!!full_scan_iteration: {}/{}'.format(ii+1,NUM_FULL_SCAN_ITERATION))
+                ## move to 0,0 take a photo
+                self.next_pan,self.next_tilt=0,3
+                self.stepper_controller.move_to(self.next_pan, self.next_tilt)
+                self.motor_wait()
+                ## take one set of UV/G image
+                print(f"Taking pano (UV) photo no.{ii+1}/{NUM_FULL_SCAN_ITERATION} at Pan: {0}, Tilt: {3}")
+                need_recalibrate = (ii == 0 or (ii % RECALIBRATE_EVERY == 0) or 
+                                    self.cam0_shutter00 is None or 
+                                    self.cam0_gain00 is None or 
+                                    self.shutter1 is None or 
+                                    self.gain1 is None)
+                if need_recalibrate:
+                    self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=ii)
+                else:
+                    sim_green_raw, sim_uv_raw = self.call_libcamera_raw_pair(
+                        green_shutter=self.cam0_shutter00,
+                        green_gain=self.cam0_gain00,
+                        green_output_dir=cam0_data_path,
+                        uv_shutter=self.shutter1,
+                        uv_gain=self.gain1,
+                        uv_output_dir=cam1_data_path,
+                        img_idx=ii
+                    )
+                    if sim_green_raw and sim_uv_raw and os.path.exists(sim_green_raw) and os.path.exists(sim_uv_raw):
+                        self._save_jpg_from_raw(sim_green_raw, camera_id=0)
+                        self._save_jpg_from_raw(sim_uv_raw, camera_id=1)
+                    else:
+                        self.on_both_shoot(green_output_path=cam0_data_path, uv_output_path=cam1_data_path, img_idx=ii)
+                print("DONE TAKING PHOTO, START SPECTRAL SCAN FOR THIS POSITION")
+                ## start the full scan
                 for idx, (pan, tilt) in enumerate(self.cam_path):
                     self.current_pan,self.current_tilt = self.stepper_controller.read_pos()
                     self.next_pan,self.next_tilt = pan, tilt
