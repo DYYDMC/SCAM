@@ -129,3 +129,29 @@ class SpectrometerController:
         except Exception as e:
             print(f"Scan error: {str(e)}")
             return {'success': False, 'error': str(e)}
+    def sanity_check_scan(self, int_time=None):
+        """Perform a single scan and check the input integration time against the measured time"""
+        if not self.is_connected or self.spec is None:
+            if not self.connect():
+                raise ConnectionError("Spectrometer not connected")
+        
+        try:
+            # Set integration time from ms -> micro-second
+            if int_time is not None:
+                #print('setting integration time')
+                self.spec.integration_time_micros(int_time * 1000)
+                #print(f"Integration time set to {int_time} ms")
+            
+            # Get spectrum
+            start = time.perf_counter()
+            wavelengths, intensity = self.spec.spectrum()
+            elapsed = time.perf_counter() - start
+            #print('more precise',elapsed*1000,'ms')
+            to_store = np.round(elapsed*1000,3)
+            print(f'input {int_time} for scan(), stored in ms {to_store}')
+            #print(f"Took {elapsed:.6f} seconds")
+            return to_store
+
+        except Exception as e:
+            print(f"Scan error: {str(e)}")
+            return {'success': False, 'error': str(e)}
