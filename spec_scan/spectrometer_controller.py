@@ -4,6 +4,7 @@ seabreeze.use('pyseabreeze')  # Use the Python backend
 import seabreeze.spectrometers as sb
 
 import os
+import time
 import numpy as np
 import json
 from datetime import datetime
@@ -95,7 +96,10 @@ class SpectrometerController:
             print(f"Integration time set to {int_time} ms")
             
             # Get spectrum
+            start = time.perf_counter()
             wavelengths, intensity = self.spec.spectrum()
+            elapsed = time.perf_counter() - start
+            print(f"Took {elapsed:.6f} seconds")
             print('Maximum of measured raw values:', np.max(intensity))
             
             # Load and apply dark correction

@@ -683,8 +683,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         
         return int_t
     def on_start_point_scan2(self):
+        ## test scan after fix the 10base integration bug
+        print("TEST START")
+        _ = self.spec_controller.scan(3*1e6)
+
+        print("TEST OVER")
         # print("I AM HERE!! SCAM ONE POSITION!")
-        NUM_SCAN_ITERATION = 20#3*(len(SPEC_TILT_POS)+1)
+        NUM_SCAN_ITERATION = 200#3*(len(SPEC_TILT_POS)+1)
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scan_data_supfolder = os.path.join(POINT_SCAN_DATA_PATH, f"POINT_SCAN_{start_time}")
 
