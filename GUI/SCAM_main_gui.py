@@ -58,7 +58,9 @@ CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 # SPEC_ROI_CAM_POS=[(0,1),(10,1),(2,1),(10,4),(4,1),(10,0),(1,-4),(10,4)]
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 # SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
-SPEC_TILT_POS=[18,13,3,-7,-18] # when table is against the balcony bar (sunny)
+#SPEC_TILT_POS=[18,13,3,-7,-18] # Schlossberg data bis 31 May 2026when table is against the balcony bar (sunny)
+SPEC_TILT_POS=[28,23,13,3,-8]
+#DZNE_SPEC_TILT_POS=[28,23,13,3,-8] # when table is against the balcony bar (sunny)
 #SPEC_TILT_POS=[13,8,3,-2,-7] # when table is back against the wall(raining)
 # SPEC_TILT_POS=[]
 MIN_SHUTTER,MAX_SHUTTER,STEP_SHUTTER= int(999), int(1033e3), int(1e4)
@@ -682,10 +684,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return int_t
     def on_start_point_scan2(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
-        NUM_SCAN_ITERATION = 3*(len(SPEC_TILT_POS)+1)
+        NUM_SCAN_ITERATION = 20#3*(len(SPEC_TILT_POS)+1)
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scan_data_supfolder = os.path.join(POINT_SCAN_DATA_PATH, f"POINT_SCAN_{start_time}")
-        os.makedirs(scan_data_path, exist_ok=True)
 
         scan_data_path = os.path.join(scan_data_supfolder, "scan_data")
         os.makedirs(scan_data_path, exist_ok=True)
@@ -718,7 +719,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 result_['motor_pan'] = self.pan_oneScan
                 result_['motor_tilt'] = tilt
                 result_['ts'] = time.strftime("%Y%m%d_%H%M%S")
-                np.save(os.path.join(scan_data_path, f"scan_iter{cc}_{ii}_pan{self.pan_oneScan}_tilt{tilt}"), result_)
+                np.save(os.path.join(scan_data_path, f"scan_{ii}_pan{self.pan_oneScan}_tilt{tilt}"), result_)
     def on_start_point_scan(self):
         """
         Start a point scan by capturing spectral data at specific positions.
