@@ -1,3 +1,5 @@
+# venv
+.venv/
 # recording
 spec_scan/2025*/
 cali/2025*/
