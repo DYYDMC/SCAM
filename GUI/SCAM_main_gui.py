@@ -59,7 +59,7 @@ CAM1_ROI_NPY = os.path.join(SCAM_PATH, "matlab_roi_extraction","cam1_mask.npy")
 #SPEC_ROI_CAM_POS=[(0,0),(0,-10),(0,-20)]
 # SPEC_TILT_POS=[18,13,8,3,-2,-7,-12,-18]
 #SPEC_TILT_POS=[18,13,3,-7,-18] # Schlossberg data bis 31 May 2026when table is against the balcony bar (sunny)
-SPEC_TILT_POS=[28,23,13,3,-8]
+SPEC_TILT_POS=[28,23,13,3,-8,-20]
 #DZNE_SPEC_TILT_POS=[28,23,13,3,-8] # when table is against the balcony bar (sunny)
 #SPEC_TILT_POS=[13,8,3,-2,-7] # when table is back against the wall(raining)
 # SPEC_TILT_POS=[]
@@ -887,7 +887,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def on_start_point_scam(self):
         # print("I AM HERE!! SCAM ONE POSITION!")
         NUM_CAM = 40
-        NUM_SCAN_ITERATION = 100*(len(SPEC_TILT_POS)+1)
+        NUM_SCAN_ITERATION = 50*(len(SPEC_TILT_POS)+1)
         RECALIBRATE_EVERY = 10
         start_time = time.strftime("%Y%m%d_%H%M%S")
         scam_data_path = os.path.join(ONE_SCAM_DATA_PATH, f"ONE_SCAM_{start_time}")
